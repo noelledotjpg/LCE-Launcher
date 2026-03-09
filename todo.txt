@@ -2,6 +2,8 @@ TODO:
 [ ] Parse world save data
 [ ] Make sure all bg apps close
 [ ] Fix preferences tab layout
+[ ] Add a way to rebuild/fetch from the latest releases
+[ ]
 
 TODO (Low Priority):
 [ ] Themes/LaF

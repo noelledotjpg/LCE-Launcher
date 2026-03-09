@@ -33,7 +33,7 @@ java {
 
 shadowJar {
     archiveBaseName.set('LCE-Launcher')
-    archiveClassifier.set('')
+    archiveClassifier.set('WIN64')
     archiveVersion.set(version)
 
     manifest {
@@ -41,4 +41,24 @@ shadowJar {
                 'Main-Class': 'com.noelledotjpg.Bootstrap'
         )
     }
+}
+
+task RunMain(type: JavaExec) {
+    group = 'application'
+    description = 'Runs com.noelledotjpg.Main'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('com.noelledotjpg.Main')
+}
+
+task RunBootstrap(type: JavaExec) {
+    group = 'application'
+    description = 'Runs com.noelledotjpg.Bootstrap'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('com.noelledotjpg.Bootstrap')
+}
+
+task BuildJar {
+    group = 'build'
+    description = 'Cleans and builds the shadow JAR'
+    dependsOn 'clean', 'shadowJar'
 }
