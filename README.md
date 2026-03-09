@@ -16,7 +16,7 @@ Head over to the [Releases](https://github.com/noelledotjpg/LCE-Launcher/release
 
 > [!WARNING]
 > Beware! This is still really early into dev, but it has the bare minimum to work as a launcher... <br>
-> There's also the fact im a complete noob at making my own java apps
+> There's also the fact I'm a complete noob at making my own java apps, lol
 
 
 ## Features
