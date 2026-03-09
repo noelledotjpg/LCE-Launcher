@@ -14,6 +14,11 @@ This is a Java launcher for [MinecraftConsoles](https://github.com/smartcmd/Mine
 
 Head over to the [Releases](https://github.com/noelledotjpg/LCE-Launcher/releases) to download a JAR!
 
+> [!WARNING]
+> Beware! This is still really early into dev, but it has the bare minimum to work as a launcher... <br>
+> There's also the fact im a complete noob at making my own java apps
+
+
 ## Features
 
 - Profiles
