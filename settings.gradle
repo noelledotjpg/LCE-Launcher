@@ -1,0 +1,13 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+    plugins {
+        id("org.beryx.jlink") version "3.2.1"
+        id 'com.github.johnrengelman.shadow' version '8.1.1'
+        id 'org.openjfx.javafxplugin' version '0.0.14'
+    }
+}
+
+rootProject.name = 'LCE-Launcher'

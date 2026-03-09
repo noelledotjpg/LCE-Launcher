@@ -1,0 +1,11 @@
+TODO:
+[ ] Parse world save data
+[ ] Make sure all bg apps close
+[ ] Fix preferences tab layout
+
+TODO (Low Priority):
+[ ] Themes/LaF
+[ ] Improve setup screen OOBE
+[ ] Refactor code
+[ ] Translations
+[ ]
