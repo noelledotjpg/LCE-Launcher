@@ -35,10 +35,8 @@ public class Main extends JFrame {
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-    public static final String VERSION = "0.1.0";
-
     public Main() {
-        setTitle("LCE Launcher " + VERSION);
+        setTitle("LCE Launcher " + VarsData.VERSION);
         setIconImage(new ImageIcon(getClass().getResource("/img/favicon.png")).getImage());
         setSize(900, 580);
         setLocationRelativeTo(null);

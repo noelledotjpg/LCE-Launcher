@@ -8,8 +8,8 @@ plugins {
 group = 'com.noelledotjpg'
 
 def extractVersion = {
-    def mainFile = file("src/main/java/com/noelledotjpg/Main.java")
-    def match = mainFile.text =~ /VERSION\s*=\s*"([^"]+)"/
+    def varsFile = file("src/main/java/com/noelledotjpg/Data/VarsData.java")
+    def match = varsFile.text =~ /VERSION\s*=\s*"([^"]+)"/
     return match ? match[0][1] : "0.0.0"
 }
 

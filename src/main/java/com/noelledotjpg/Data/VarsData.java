@@ -6,6 +6,8 @@ public class VarsData {
     private String  lceFolder;
     private String  minecraftExe;
 
+    public static final String VERSION = "0.1.0";
+
     public boolean isSetupDone()               { return setupDone; }
     public void    setSetupDone(boolean v)     { this.setupDone = v; }
 
