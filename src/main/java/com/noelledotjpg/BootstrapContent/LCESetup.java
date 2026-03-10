@@ -65,11 +65,24 @@ public class LCESetup {
     }
 
     private void ensureRepo() throws Exception {
-        if (repoRoot.exists()) {
+        File cmakeLists = new File(repoRoot, "CMakeLists.txt");
+
+        if (repoRoot.exists() && cmakeLists.exists()) {
             logger.accept("Repo folder already exists, skipping clone.");
             progress.accept(25);
             return;
         }
+
+        if (repoRoot.exists()) {
+            logger.accept("Repo folder exists but appears incomplete, deleting and re-cloning...");
+            ProcessBuilder del = new ProcessBuilder(
+                    "cmd", "/c", "rmdir", "/s", "/q", repoRoot.getAbsolutePath());
+            int exitCode = del.start().waitFor();
+            if (exitCode != 0 || repoRoot.exists())
+                throw new IOException("Failed to delete incomplete repo folder: " + repoRoot.getAbsolutePath());
+            logger.accept("Deleted incomplete repo folder.");
+        }
+
         logger.accept("Cloning repository into " + repoRoot.getAbsolutePath() + "...");
         repoRoot.getParentFile().mkdirs();
         runner.run(new ProcessBuilder("git", "clone", SetupPaths.REPO_URL,
@@ -209,10 +222,26 @@ public class LCESetup {
         vars.setSetupDone(false);
         vars.setLceFolder(repoRoot.getAbsolutePath());
         vars.setMinecraftExe(SetupPaths.releaseExe(repoRoot).getAbsolutePath());
+        vars.setInstalledCommitHash(getRepoHeadHash());
         try (FileWriter w = new FileWriter(f)) {
             new GsonBuilder().setPrettyPrinting().create().toJson(vars, w);
         }
         logger.accept("Saved vars.json");
+    }
+
+    /** Runs `git rev-parse HEAD` in the repo directory and returns the full commit hash. */
+    private String getRepoHeadHash() {
+        try {
+            Process p = new ProcessBuilder("git", "rev-parse", "HEAD")
+                    .directory(repoRoot)
+                    .start();
+            String hash = new String(p.getInputStream().readAllBytes()).trim();
+            p.waitFor();
+            return hash;
+        } catch (Exception e) {
+            logger.accept("Warning: could not read repo HEAD hash: " + e.getMessage());
+            return "";
+        }
     }
 
     // --- Little-endian write helpers ---

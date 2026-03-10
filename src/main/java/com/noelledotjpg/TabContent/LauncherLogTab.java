@@ -2,7 +2,8 @@ package com.noelledotjpg.TabContent;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -126,7 +127,8 @@ public class LauncherLogTab extends JPanel {
 
         @Override
         public void run() {
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream))) {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(inputStream, java.nio.charset.StandardCharsets.UTF_16LE))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     logTab.appendLog(line);

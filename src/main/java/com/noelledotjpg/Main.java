@@ -3,7 +3,7 @@ package com.noelledotjpg;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.noelledotjpg.Data.*;
-import com.noelledotjpg.MainContent.LaunchArguments;
+import com.noelledotjpg.MainContent.*;
 import com.noelledotjpg.TabContent.*;
 
 import javax.swing.*;
@@ -61,6 +61,9 @@ public class Main extends JFrame {
         launcherLogTab = new LauncherLogTab();
 
         UpdateNotesTab updateNotesTab = new UpdateNotesTab(preferencesData);
+        if (preferencesData.isCheckForUpdates())
+            UpdateWindow.checkAndPrompt(this, varsData.getInstalledCommitHash());
+
         tabbedPane.addTab("Update Notes",   updateNotesTab);
         tabbedPane.addTab("Launcher Log",   launcherLogTab);
         tabbedPane.addTab("Profile Editor", profileEditorTab);
