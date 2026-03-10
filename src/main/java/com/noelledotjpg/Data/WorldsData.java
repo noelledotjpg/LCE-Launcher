@@ -188,10 +188,6 @@ public class WorldsData {
 
     // save patching
 
-    /**
-     * Renames the world by patching the {@code LevelName} TAG_String inside
-     * {@code level.dat}, then recompressing and writing {@code saveData.ms}.
-     */
     public void rename(String newName) throws IOException {
         byte[] nameBytes = newName.getBytes(StandardCharsets.UTF_8);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -202,12 +198,6 @@ public class WorldsData {
         this.name = newName;
     }
 
-    /**
-     * Changes the world's game mode by overwriting the {@code GameType} TAG_Int
-     * (4 bytes, big-endian) inside {@code level.dat}.
-     *
-     * @param gamemodeId 0=Survival, 1=Creative, 2=Adventure, 3=Spectator
-     */
     public void setGamemode(int gamemodeId) throws IOException {
         byte[] value = new byte[]{
                 (byte) ((gamemodeId >> 24) & 0xFF),

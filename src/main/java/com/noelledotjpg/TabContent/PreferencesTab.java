@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.PreferencesData;
+import com.noelledotjpg.Data.VarsData;
 import com.noelledotjpg.MainContent.LaunchArguments;
 
 import javax.swing.*;
@@ -11,8 +12,10 @@ import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
+import java.util.Comparator;
 import java.util.function.Consumer;
 
 public class PreferencesTab extends JPanel {
@@ -106,6 +109,12 @@ public class PreferencesTab extends JPanel {
                 prefs.getUpdateFrequency(),
                 checked  -> { prefs.setCheckForUpdates(checked); save(); },
                 selected -> { prefs.setUpdateFrequency(selected); save(); }
+        ));
+        s.addRow(buttonRow(
+                "Redownload LCE",
+                "Delete and re-clone the repo",
+                "Redownload",
+                e -> redownloadRepo()
         ));
         return s.build();
     }
@@ -278,6 +287,54 @@ public class PreferencesTab extends JPanel {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void redownloadRepo() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "This will delete the entire LCE repo folder and re-run setup from scratch.\n" +
+                        "Make sure you have backups of any worlds or saves you want to keep.\n\n" +
+                        "Are you sure?",
+                "Redownload LCE", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        try {
+            VarsData vars;
+            try (Reader r = Files.newBufferedReader(AppPaths.VARS_JSON)) {
+                vars = new Gson().fromJson(r, VarsData.class);
+            }
+            if (vars == null || vars.getLceFolder() == null || vars.getLceFolder().isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "LCE folder path not found in vars.json.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            File repoFolder = new File(vars.getLceFolder());
+            if (repoFolder.exists()) deleteDirectory(repoFolder);
+
+            vars.setSetupDone(false);
+            vars.setInstalledCommitHash(null);
+            Files.writeString(AppPaths.VARS_JSON,
+                    new GsonBuilder().setPrettyPrinting().create().toJson(vars));
+
+            JOptionPane.showMessageDialog(this,
+                    "Repo deleted. Restart the launcher to re-run setup.",
+                    "Done", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this,
+                    "Failed to delete repo:\n" + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void deleteDirectory(File dir) throws IOException {
+        Files.walk(dir.toPath())
+                .sorted(Comparator.reverseOrder())
+                .forEach(p -> {
+                    try { Files.delete(p); }
+                    catch (IOException ignored) {}
+                });
     }
 
     private void createDesktopShortcut() {
