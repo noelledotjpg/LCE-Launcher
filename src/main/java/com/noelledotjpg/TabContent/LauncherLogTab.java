@@ -19,7 +19,6 @@ public class LauncherLogTab extends JPanel {
     public LauncherLogTab() {
         setLayout(new BorderLayout());
 
-        // --- Log Area ---
         logArea = new JTextArea();
         logArea.setEditable(false);
         logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -28,10 +27,9 @@ public class LauncherLogTab extends JPanel {
 
         add(new JScrollPane(logArea), BorderLayout.CENTER);
 
-        // --- Search Panel ---
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
 
-        searchField = new JTextField(15); // smaller input area
+        searchField = new JTextField(15);
         searchField.setForeground(Color.GRAY);
         searchField.setText("Search logs...");
         searchField.addFocusListener(new FocusAdapter() {
@@ -74,7 +72,6 @@ public class LauncherLogTab extends JPanel {
         add(searchPanel, BorderLayout.SOUTH);
     }
 
-    // --- Log methods ---
     public void appendLog(String text) {
         SwingUtilities.invokeLater(() -> {
             String timestamp = timestampFormat.format(new Date());
@@ -87,7 +84,6 @@ public class LauncherLogTab extends JPanel {
         SwingUtilities.invokeLater(() -> logArea.setText(""));
     }
 
-    // --- Search method ---
     private void search(boolean forward) {
         String searchText = searchField.getText();
         if (searchText.isEmpty() || searchText.equals("Search logs...")) return;
@@ -101,12 +97,12 @@ public class LauncherLogTab extends JPanel {
         int index;
         if (forward) {
             index = content.indexOf(searchText, lastSearchIndex);
-            if (index == -1) { // wrap around
+            if (index == -1) {
                 index = content.indexOf(searchText, 0);
             }
         } else {
             index = content.lastIndexOf(searchText, lastSearchIndex - 1);
-            if (index == -1) { // wrap around
+            if (index == -1) {
                 index = content.lastIndexOf(searchText, content.length());
             }
         }
@@ -118,7 +114,6 @@ public class LauncherLogTab extends JPanel {
         }
     }
 
-    // --- StreamGobbler ---
     public static class StreamGobbler implements Runnable {
 
         private final java.io.InputStream inputStream;
