@@ -128,7 +128,7 @@ public class LauncherLogTab extends JPanel {
         @Override
         public void run() {
             try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(inputStream, java.nio.charset.StandardCharsets.UTF_16LE))) {
+                    new java.io.InputStreamReader(inputStream))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     logTab.appendLog(line);
