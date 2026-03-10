@@ -2,7 +2,7 @@ package com.noelledotjpg.Data;
 
 public class VarsData {
 
-    public static final String VERSION = "v1.0.0";
+    public static final String VERSION = "v1.0.1";
 
     private boolean setupDone;
     private String  lceFolder;
