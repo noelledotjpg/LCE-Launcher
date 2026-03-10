@@ -43,8 +43,8 @@ public class Main extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        varsData       = loadVars();
-        profilesData   = loadProfiles();
+        varsData        = loadVars();
+        profilesData    = loadProfiles();
         preferencesData = loadPreferences();
         playtimeTracker = new PlaytimeTracker();
 
@@ -60,23 +60,23 @@ public class Main extends JFrame {
         tabbedPane     = new JTabbedPane();
         launcherLogTab = new LauncherLogTab();
 
-        tabbedPane.addTab("Update Notes",   new UpdateNotesTab());
+        UpdateNotesTab updateNotesTab = new UpdateNotesTab(preferencesData);
+        tabbedPane.addTab("Update Notes",   updateNotesTab);
         tabbedPane.addTab("Launcher Log",   launcherLogTab);
         tabbedPane.addTab("Profile Editor", profileEditorTab);
         tabbedPane.addTab("Preferences",
-                new PreferencesTab(preferencesData, profilesCombo, new LaunchArguments(), varsData.getMinecraftExe()));
+                new PreferencesTab(preferencesData, profilesCombo, new LaunchArguments(),
+                        varsData.getMinecraftExe(), updateNotesTab));
         tabbedPane.addTab("Worlds",  new WorldsTab(varsData));
         tabbedPane.addTab("Servers", new ServersTab(varsData));
 
         add(tabbedPane, BorderLayout.CENTER);
 
-        // --- Bottom bar ---
         JPanel bottomPanel = new JPanel(new BorderLayout());
         bottomPanel.setPreferredSize(new Dimension(0, 60));
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Left: profile selector
         JPanel leftPanel = new JPanel(null);
         leftPanel.setPreferredSize(new Dimension(250, 60));
 
@@ -97,7 +97,6 @@ public class Main extends JFrame {
 
         bottomPanel.add(leftPanel, BorderLayout.WEST);
 
-        // Center: play button
         JPanel centerPanel = new JPanel(new GridBagLayout());
         playButton = new JButton("Play");
         playButton.setPreferredSize(new Dimension(290, 49));
@@ -105,7 +104,6 @@ public class Main extends JFrame {
         centerPanel.add(playButton);
         bottomPanel.add(centerPanel, BorderLayout.CENTER);
 
-        // Right: welcome labels + folder button
         JPanel rightPanel = new JPanel(null);
         rightPanel.setPreferredSize(new Dimension(250, 60));
 
@@ -127,7 +125,6 @@ public class Main extends JFrame {
 
         bottomPanel.add(rightPanel, BorderLayout.EAST);
 
-        // --- Actions ---
         playButton.addActionListener(e -> playProfile());
         newProfileButton.addActionListener(e -> addProfile());
         editProfileButton.addActionListener(e -> editProfile());
@@ -139,7 +136,6 @@ public class Main extends JFrame {
                 welcomeLabel.setText("Welcome, " + selected);
         });
 
-        // --- Final setup ---
         updateProfilesCombo(profilesData.getUsernames());
         if (profilesData.getLastUsed() != null && !profilesData.getLastUsed().isEmpty())
             profilesCombo.setSelectedItem(profilesData.getLastUsed());
@@ -153,8 +149,6 @@ public class Main extends JFrame {
         }
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
-
-    // --- Data loading ---
 
     private VarsData loadVars() {
         try {
@@ -212,8 +206,6 @@ public class Main extends JFrame {
         }
     }
 
-    // --- UI helpers ---
-
     private void updateProfilesCombo(ArrayList<String> profiles) {
         profilesCombo.removeAllItems();
         if (profiles.isEmpty()) {
@@ -224,8 +216,6 @@ public class Main extends JFrame {
             profilesCombo.setEnabled(true);
         }
     }
-
-    // --- Button actions ---
 
     private void addProfile() {
         String newProfile = profileEditorTab.showAddProfileDialog(this);
@@ -275,8 +265,8 @@ public class Main extends JFrame {
             playtimeTracker.startSession(profile);
 
             String visibility = preferencesData.getLauncherVisibility();
-            if ("Hide when game starts".equals(visibility))        setVisible(false);
-            else if ("Close when game starts".equals(visibility))  dispose();
+            if ("Hide when game starts".equals(visibility))       setVisible(false);
+            else if ("Close when game starts".equals(visibility)) dispose();
 
             new Thread(() -> {
                 try {

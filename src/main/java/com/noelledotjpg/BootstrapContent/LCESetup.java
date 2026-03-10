@@ -42,7 +42,6 @@ public class LCESetup {
         ensureRepo();
 
         writeUsernameTxt();
-        ensureServersFile();
         progress.accept(30);
 
         writeUsernameJson();
@@ -56,6 +55,7 @@ public class LCESetup {
             runCMake();
             buildRelease();
             moveArtifacts();
+            writeServersDb();   // after moveArtifacts so release dir exists
             progress.accept(90);
         }
 
@@ -91,7 +91,6 @@ public class LCESetup {
             if (bracket >= 0 && percent > bracket) {
                 try {
                     int val = Integer.parseInt(line.substring(bracket + 1, percent).trim());
-                    // cmake configure mapped to 35–50%
                     progress.accept(35 + (val * 15 / 100));
                 } catch (NumberFormatException ignored) {}
             }
@@ -109,7 +108,6 @@ public class LCESetup {
             if (line.matches("\\d+>.*\\.(cpp|c|cc|cxx).*")) {
                 compiled[0]++;
                 int val = Math.min(compiled[0] * 100 / ESTIMATED_CPP_FILES, 99);
-                // build mapped to 50–88%
                 progress.accept(50 + (val * 38 / 100));
             }
         });
@@ -132,7 +130,6 @@ public class LCESetup {
         }
 
         copyToRelease(SetupPaths.usernameTxt(repoRoot), releaseDir);
-        copyToRelease(SetupPaths.serversTxt(repoRoot),  releaseDir);
     }
 
     private void copyToRelease(File file, File releaseDir) throws IOException {
@@ -141,6 +138,35 @@ public class LCESetup {
                     StandardCopyOption.REPLACE_EXISTING);
             logger.accept("Copied: " + file.getName());
         }
+    }
+
+    private void writeServersDb() throws IOException {
+        File releaseDir = SetupPaths.releaseDir(repoRoot);
+        File dbFile     = new File(releaseDir, "servers.db");
+
+        if (dbFile.exists()) {
+            logger.accept("servers.db already exists, skipping.");
+            return;
+        }
+
+        String ip   = "127.0.0.1";
+        String name = "Localhost Server";
+        int    port = 25565;
+
+        try (DataOutputStream out = new DataOutputStream(new FileOutputStream(dbFile))) {
+            out.writeBytes("MCSV");
+            writeIntLE(out, 1);          // version
+            writeIntLE(out, 1);          // entry count
+
+            byte[] ipBytes   = ip.getBytes();
+            byte[] nameBytes = name.getBytes();
+            writeShortLE(out, ipBytes.length);
+            out.write(ipBytes);
+            writeShortLE(out, port);
+            writeShortLE(out, nameBytes.length);
+            out.write(nameBytes);
+        }
+        logger.accept("Created servers.db");
     }
 
     private boolean isBuildSystemFile(String name) {
@@ -168,15 +194,6 @@ public class LCESetup {
         logger.accept("Saved username.txt");
     }
 
-    private void ensureServersFile() throws IOException {
-        File f = SetupPaths.serversTxt(repoRoot);
-        f.getParentFile().mkdirs();
-        if (!f.exists()) {
-            try (FileWriter w = new FileWriter(f)) { w.write("127.0.0.1\n25565\nLocalhost Server\n"); }
-            logger.accept("Created servers.txt");
-        }
-    }
-
     private void writeUsernameJson() throws IOException {
         File f = new File(SetupPaths.USERNAMES_JSON);
         f.getParentFile().mkdirs();
@@ -196,5 +213,19 @@ public class LCESetup {
             new GsonBuilder().setPrettyPrinting().create().toJson(vars, w);
         }
         logger.accept("Saved vars.json");
+    }
+
+    // --- Little-endian write helpers ---
+
+    private static void writeShortLE(DataOutputStream out, int value) throws IOException {
+        out.writeByte(value & 0xFF);
+        out.writeByte((value >> 8) & 0xFF);
+    }
+
+    private static void writeIntLE(DataOutputStream out, int value) throws IOException {
+        out.writeByte(value & 0xFF);
+        out.writeByte((value >> 8) & 0xFF);
+        out.writeByte((value >> 16) & 0xFF);
+        out.writeByte((value >> 24) & 0xFF);
     }
 }

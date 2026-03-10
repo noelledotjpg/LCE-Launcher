@@ -56,7 +56,7 @@ public class ProfileEditorTab extends JPanel {
 
         add(new JScrollPane(profileTable), BorderLayout.CENTER);
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
         JButton addButton    = new JButton("Add");
         JButton editButton   = new JButton("Edit");
         JButton removeButton = new JButton("Remove");

@@ -1,6 +1,6 @@
 TODO:
 [x] Parse world save data
-[ ] Make sure all bg apps close
+[x] Make sure all bg apps close
 [x] Fix preferences tab layout
 [ ] Add a way to rebuild/fetch from the latest releases
 [ ]
@@ -8,7 +8,7 @@ TODO:
 TODO (Low Priority):
 [ ] Themes/LaF
 [x] Improve setup screen OOBE
-[~] Refactor code
+[x] Refactor code
 [ ] Translations
 [ ] Add a way to clear play time from profiles
 [ ]

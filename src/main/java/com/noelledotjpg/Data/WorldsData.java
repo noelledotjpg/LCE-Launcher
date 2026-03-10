@@ -12,6 +12,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.zip.DataFormatException;
+import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 public class WorldsData {
@@ -51,7 +52,7 @@ public class WorldsData {
         populateFileInfo(folder);
     }
 
-    // --- Save parsing ---
+    // save parsing
 
     private void parse(Path saveFile) throws Exception {
         if (!Files.exists(saveFile)) return;
@@ -63,6 +64,8 @@ public class WorldsData {
         }
         parseLevelDat(levelDat.getBytes());
     }
+
+    // decompression
 
     private static byte[] decompress(byte[] raw) throws IOException {
         if (raw.length < 8) throw new IOException("File too short");
@@ -87,8 +90,30 @@ public class WorldsData {
         }
     }
 
+    private static byte[] compress(byte[] data) {
+        Deflater def = new Deflater(Deflater.DEFAULT_COMPRESSION);
+        def.setInput(data);
+        def.finish();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
+        byte[] buf = new byte[8192];
+        while (!def.finished()) {
+            int n = def.deflate(buf);
+            baos.write(buf, 0, n);
+        }
+        def.end();
+
+        // prepend LCE header: saveVer=0 (LE u32) + decompressedSize (LE u32)
+        byte[] compressed = baos.toByteArray();
+        ByteBuffer out = ByteBuffer.allocate(8 + compressed.length).order(ByteOrder.LITTLE_ENDIAN);
+        out.putInt(0);            // saveVer
+        out.putInt(data.length);  // decompressed size
+        out.put(compressed);
+        return out.array();
+    }
+
     /**
-     * Virtual filesystem layout (confirmed from binary analysis).
+     * Virtual filesystem layout
      *
      * <p><b>Global header</b> (first 12 bytes of decompressed data):
      * <pre>
@@ -159,6 +184,199 @@ public class WorldsData {
         for (VirtualFile f : parseFileTable(decompressed))
             if (f.name.equals("level.dat")) return f;
         return null;
+    }
+
+    // save patching
+
+    /**
+     * Renames the world by patching the {@code LevelName} TAG_String inside
+     * {@code level.dat}, then recompressing and writing {@code saveData.ms}.
+     */
+    public void rename(String newName) throws IOException {
+        byte[] nameBytes = newName.getBytes(StandardCharsets.UTF_8);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        baos.write((nameBytes.length >> 8) & 0xFF);
+        baos.write(nameBytes.length & 0xFF);
+        baos.write(nameBytes);
+        patchLevelDat("LevelName", (byte) 8, baos.toByteArray(), true);
+        this.name = newName;
+    }
+
+    /**
+     * Changes the world's game mode by overwriting the {@code GameType} TAG_Int
+     * (4 bytes, big-endian) inside {@code level.dat}.
+     *
+     * @param gamemodeId 0=Survival, 1=Creative, 2=Adventure, 3=Spectator
+     */
+    public void setGamemode(int gamemodeId) throws IOException {
+        byte[] value = new byte[]{
+                (byte) ((gamemodeId >> 24) & 0xFF),
+                (byte) ((gamemodeId >> 16) & 0xFF),
+                (byte) ((gamemodeId >> 8)  & 0xFF),
+                (byte)  (gamemodeId        & 0xFF)
+        };
+        patchLevelDat("GameType", (byte) 3, value, false);
+        this.gamemode = GAMEMODE_NAMES.getOrDefault(gamemodeId, String.valueOf(gamemodeId));
+    }
+
+    /**
+     * NBT field patcher
+     *
+     * <p>Walks the {@code level.dat} NBT inside {@code saveData.ms}, locates
+     * the first tag matching {@code targetName} and {@code targetTagType},
+     * replaces its value bytes with {@code newValueBytes}, then recompresses
+     * and writes the save back to disk.
+     *
+     * @param targetName     NBT tag name to find (e.g. "LevelName", "GameType")
+     * @param targetTagType  NBT type byte (8=TAG_String, 3=TAG_Int, …)
+     * @param newValueBytes  raw bytes to write as the new value (for TAG_String:
+     *                       uint16-BE length prefix + UTF-8 body; for TAG_Int:
+     *                       4 bytes big-endian)
+     * @param variableSize   {@code true} when the old and new value may differ in
+     *                       length (TAG_String); {@code false} for fixed-size tags
+     */
+    private void patchLevelDat(String targetName, byte targetTagType,
+                               byte[] newValueBytes, boolean variableSize) throws IOException {
+        Path   saveFile = folder.resolve("saveData.ms");
+        byte[] blob     = decompress(Files.readAllBytes(saveFile));
+
+        ByteBuffer buf          = ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN);
+        int        tableStart   = buf.getInt(0);
+        int        numFiles     = buf.getShort(4) & 0xFFFF;
+
+        int ldEntryOff = -1;
+        int ldStart    = -1;
+        int ldLen      = -1;
+
+        for (int i = 0; i < numFiles; i++) {
+            int off = tableStart + i * ENTRY_SIZE;
+            if (off + ENTRY_SIZE > blob.length) break;
+            String fname = new String(blob, off, FNAME_BYTES, StandardCharsets.UTF_16LE)
+                    .replace("\0", "");
+            if (fname.equals("level.dat")) {
+                ldLen      = buf.getInt(off + FNAME_BYTES);
+                ldStart    = buf.getInt(off + FNAME_BYTES + 4);
+                ldEntryOff = off;
+                break;
+            }
+        }
+        if (ldEntryOff < 0) throw new IOException("level.dat not found in save");
+
+        byte[] oldNbt = Arrays.copyOfRange(blob, ldStart, ldStart + ldLen);
+
+        // find the value range of the target tag using CountingInputStream
+        CountingInputStream cs  = new CountingInputStream(new ByteArrayInputStream(oldNbt));
+        DataInputStream     dis = new DataInputStream(cs);
+        dis.readByte();          // root TAG_Compound
+        skipNbtString(dis);      // root name
+
+        int[] valStart = {-1};
+        int[] valEnd   = {-1};
+        findTagValueRange(dis, cs, targetTagType, targetName, valStart, valEnd);
+
+        if (valStart[0] < 0)
+            throw new IOException(targetName + " tag not found in level.dat");
+
+        // splice new value bytes into NBT
+        int    oldValLen = valEnd[0] - valStart[0];
+        byte[] newNbt    = new byte[oldNbt.length - oldValLen + newValueBytes.length];
+        System.arraycopy(oldNbt,       0,              newNbt, 0,                 valStart[0]);
+        System.arraycopy(newValueBytes, 0,             newNbt, valStart[0],        newValueBytes.length);
+        System.arraycopy(oldNbt,       valEnd[0],      newNbt, valStart[0] + newValueBytes.length,
+                oldNbt.length - valEnd[0]);
+
+        int sizeDelta = newNbt.length - oldNbt.length;
+
+        // splice new NBT into blob
+        byte[] newBlob = new byte[blob.length + sizeDelta];
+        System.arraycopy(blob,   0,              newBlob, 0,             ldStart);
+        System.arraycopy(newNbt, 0,              newBlob, ldStart,        newNbt.length);
+        System.arraycopy(blob,   ldStart + ldLen, newBlob, ldStart + newNbt.length,
+                blob.length - (ldStart + ldLen));
+
+        // update level.dat length in file table if size changed
+        if (sizeDelta != 0)
+            ByteBuffer.wrap(newBlob).order(ByteOrder.LITTLE_ENDIAN)
+                    .putInt(ldEntryOff + FNAME_BYTES, newNbt.length);
+
+        Files.write(saveFile, compress(newBlob));
+    }
+
+    /**
+     * Recursively walks a TAG_Compound, recording the byte range
+     * {@code [valStart, valEnd)} of the value payload for the first tag
+     * matching both {@code wantType} and {@code wantName}.
+     */
+    private static void findTagValueRange(DataInputStream dis, CountingInputStream cs,
+                                          byte wantType, String wantName,
+                                          int[] valStart, int[] valEnd) throws IOException {
+        while (true) {
+            byte   tag     = dis.readByte();
+            if (tag == 0) return;                        // TAG_End
+            String tagName = readNbtString(dis);
+
+            if (tag == wantType && wantName.equals(tagName)) {
+                valStart[0] = (int) cs.getCount();
+                skipTagValue(dis, tag);                  // consume the value to find end
+                valEnd[0] = (int) cs.getCount();
+                return;
+            }
+            skipTagValue(dis, tag);                      // skip unrelated tag value
+            if (valStart[0] >= 0) return;                // already found (nested)
+        }
+    }
+
+    private static void skipTagValue(DataInputStream dis, byte tag) throws IOException {
+        switch (tag) {
+            case 1  -> dis.readByte();
+            case 2  -> dis.readShort();
+            case 3  -> dis.readInt();
+            case 4  -> dis.readLong();
+            case 5  -> dis.readFloat();
+            case 6  -> dis.readDouble();
+            case 7  -> dis.skipBytes(dis.readInt());
+            case 8  -> dis.skipBytes(dis.readUnsignedShort());
+            case 9  -> {
+                byte elemTag = dis.readByte();
+                int  count   = dis.readInt();
+                for (int i = 0; i < count; i++) skipTagValue(dis, elemTag);
+            }
+            case 10 -> {                                  // TAG_Compound — skip until TAG_End
+                while (true) {
+                    byte inner = dis.readByte();
+                    if (inner == 0) break;
+                    skipNbtString(dis);
+                    skipTagValue(dis, inner);
+                }
+            }
+            case 11 -> dis.skipBytes(dis.readInt() * 4);
+        }
+    }
+
+    private static class CountingInputStream extends FilterInputStream {
+        private long count = 0;
+
+        CountingInputStream(InputStream in) { super(in); }
+
+        @Override public int read() throws IOException {
+            int b = super.read();
+            if (b >= 0) count++;
+            return b;
+        }
+
+        @Override public int read(byte[] b, int off, int len) throws IOException {
+            int n = super.read(b, off, len);
+            if (n > 0) count += n;
+            return n;
+        }
+
+        @Override public long skip(long n) throws IOException {
+            long s = super.skip(n);
+            count += s;
+            return s;
+        }
+
+        public long getCount() { return count; }
     }
 
     /**
@@ -265,14 +483,6 @@ public class WorldsData {
         thumbnail = loadThumbnail(folder);
     }
 
-    /**
-     * Attempts to locate a world thumbnail, trying in order:
-     * <ol>
-     *   <li>Known sidecar filenames next to {@code saveData.ms}</li>
-     *   <li>JPEG embedded inside the save file itself</li>
-     *   <li>{@code /img/unknown.png} from the classpath as a fallback</li>
-     * </ol>
-     */
     private static BufferedImage loadThumbnail(Path folder) {
         for (String candidate : new String[]{
                 "thumbnail.jpg", "thumbnail.png",
@@ -295,13 +505,6 @@ public class WorldsData {
         return UNKNOWN_THUMBNAIL;
     }
 
-    /**
-     * Searches the decompressed save blob for an embedded JPEG thumbnail.
-     *
-     * <p>On Xbox One builds, thumbnails are managed by the platform's
-     * StorageManager and are not guaranteed to be present inside
-     * {@code saveData.ms}. Returns {@code null} when none is found.
-     */
     private static BufferedImage extractThumbnailFromSave(Path saveFile) throws Exception {
         if (!Files.exists(saveFile)) return null;
 
@@ -343,4 +546,11 @@ public class WorldsData {
     public String getSize()             { return size; }
     public String getCreated()          { return created; }
     public Path   getFolder()           { return folder; }
+
+
+    public int getGamemodeId() {
+        for (Map.Entry<Integer, String> e : GAMEMODE_NAMES.entrySet())
+            if (e.getValue().equals(gamemode)) return e.getKey();
+        return -1;
+    }
 }

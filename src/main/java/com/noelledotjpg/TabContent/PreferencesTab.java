@@ -23,18 +23,21 @@ public class PreferencesTab extends JPanel {
     private static final int SECTION_GAP = 16;
     private static final int ROW_GAP     = 8;
 
-    private final String          exePath;
-    private final PreferencesData prefs;
-    private final Gson            gson = new GsonBuilder().setPrettyPrinting().create();
+    private final String            exePath;
+    private final PreferencesData   prefs;
+    private final Gson              gson = new GsonBuilder().setPrettyPrinting().create();
     private final JComboBox<String> profileCombo;
-    private final LaunchArguments launchArgs;
+    private final LaunchArguments   launchArgs;
+    private final UpdateNotesTab    updateNotesTab;
 
     public PreferencesTab(PreferencesData prefs, JComboBox<String> profileCombo,
-                          LaunchArguments launchArgs, String exePath) {
-        this.prefs        = prefs;
-        this.profileCombo = profileCombo;
-        this.launchArgs   = launchArgs;
-        this.exePath      = exePath;
+                          LaunchArguments launchArgs, String exePath,
+                          UpdateNotesTab updateNotesTab) {
+        this.prefs          = prefs;
+        this.profileCombo   = profileCombo;
+        this.launchArgs     = launchArgs;
+        this.exePath        = exePath;
+        this.updateNotesTab = updateNotesTab;
 
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
@@ -69,7 +72,22 @@ public class PreferencesTab extends JPanel {
 
     private JPanel buildAppearanceSection() {
         SectionBuilder s = new SectionBuilder("Appearance");
-        // appearance settings go here
+        s.addRow(comboFieldRow(
+                "Update News page",
+                new String[]{"Default", "Custom"},
+                prefs.getNewsPageMode(),
+                prefs.getNewsPageCustomUrl(),
+                selected -> {
+                    prefs.setNewsPageMode(selected);
+                    save();
+                    updateNotesTab.reload(prefs.getResolvedNewsUrl());
+                },
+                text -> {
+                    prefs.setNewsPageCustomUrl(text);
+                    save();
+                    updateNotesTab.reload(prefs.getResolvedNewsUrl());
+                }
+        ));
         return s.build();
     }
 
@@ -80,6 +98,14 @@ public class PreferencesTab extends JPanel {
                 "Create shortcut for current profile",
                 "Create",
                 e -> createDesktopShortcut()
+        ));
+        s.addRow(checkboxComboRow(
+                "Check for LCE updates",
+                prefs.isCheckForUpdates(),
+                new String[]{"When launcher opens", "Every 24 hours", "Every week"},
+                prefs.getUpdateFrequency(),
+                checked  -> { prefs.setCheckForUpdates(checked); save(); },
+                selected -> { prefs.setUpdateFrequency(selected); save(); }
         ));
         return s.build();
     }
@@ -96,13 +122,85 @@ public class PreferencesTab extends JPanel {
         return row;
     }
 
+    private JPanel checkboxComboRow(String labelText, boolean checked, String[] options,
+                                    String current, Consumer<Boolean> onCheck,
+                                    Consumer<String> onCombo) {
+        JPanel row = newRow();
+
+        JCheckBox box = new JCheckBox();
+        box.setSelected(checked);
+
+        JLabel label = new JLabel(labelText);
+        label.setLabelFor(box);
+
+        JComboBox<String> combo = new JComboBox<>(options);
+        combo.setSelectedItem(current != null && !current.isEmpty() ? current : options[0]);
+        combo.setEnabled(checked);
+        combo.setPreferredSize(new Dimension(160, ROW_HEIGHT));
+        combo.setMaximumSize(new Dimension(160, ROW_HEIGHT));
+
+        box.addActionListener(e -> {
+            combo.setEnabled(box.isSelected());
+            onCheck.accept(box.isSelected());
+        });
+        combo.addActionListener(e -> onCombo.accept((String) combo.getSelectedItem()));
+
+        JPanel checkLabel = new JPanel();
+        checkLabel.setLayout(new BoxLayout(checkLabel, BoxLayout.X_AXIS));
+        checkLabel.setOpaque(false);
+        checkLabel.setPreferredSize(new Dimension(LABEL_WIDTH, ROW_HEIGHT));
+        checkLabel.setMinimumSize(new Dimension(LABEL_WIDTH, ROW_HEIGHT));
+        checkLabel.setMaximumSize(new Dimension(LABEL_WIDTH, ROW_HEIGHT));
+        checkLabel.add(box);
+        checkLabel.add(Box.createHorizontalStrut(4));
+        checkLabel.add(label);
+
+        row.add(checkLabel);
+        row.add(combo);
+        return row;
+    }
+
+    private JPanel comboFieldRow(String labelText, String[] options, String current,
+                                 String currentText, Consumer<String> onCombo,
+                                 Consumer<String> onField) {
+        JPanel row = newRow();
+
+        JComboBox<String> combo = new JComboBox<>(options);
+        combo.setSelectedItem(current != null && !current.isEmpty() ? current : options[0]);
+        combo.setPreferredSize(new Dimension(80, ROW_HEIGHT));
+        combo.setMaximumSize(new Dimension(80, ROW_HEIGHT));
+
+        JTextField field = new JTextField(currentText != null ? currentText : "");
+        field.setEnabled("Custom".equals(combo.getSelectedItem()));
+        field.setPreferredSize(new Dimension(200, ROW_HEIGHT));
+        field.setMaximumSize(new Dimension(200, ROW_HEIGHT));
+
+        combo.addActionListener(e -> {
+            boolean custom = "Custom".equals(combo.getSelectedItem());
+            field.setEnabled(custom);
+            onCombo.accept((String) combo.getSelectedItem());
+        });
+        field.addActionListener(e -> onField.accept(field.getText().trim()));
+        field.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override public void focusLost(java.awt.event.FocusEvent e) {
+                onField.accept(field.getText().trim());
+            }
+        });
+
+        row.add(fixedLabel(new JLabel(labelText)));
+        row.add(combo);
+        row.add(Box.createHorizontalStrut(6));
+        row.add(field);
+        return row;
+    }
+
     private JPanel comboRow(String labelText, String[] options,
                             String current, Consumer<String> onChange) {
         JPanel row = newRow();
         JComboBox<String> combo = new JComboBox<>(options);
         combo.setSelectedItem(current != null && !current.isEmpty() ? current : options[0]);
-        combo.setPreferredSize(new Dimension(120, 21));
-        combo.setMaximumSize(new Dimension(200, 21));
+        combo.setPreferredSize(new Dimension(200, 21));
+        combo.setMaximumSize(new Dimension(230, 21));
         combo.addActionListener(e -> onChange.accept((String) combo.getSelectedItem()));
         JLabel label = new JLabel(labelText);
         label.setLabelFor(combo);

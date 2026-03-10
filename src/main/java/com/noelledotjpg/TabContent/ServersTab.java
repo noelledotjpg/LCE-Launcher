@@ -2,11 +2,13 @@ package com.noelledotjpg.TabContent;
 
 import com.noelledotjpg.Data.VarsData;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.util.ArrayList;
@@ -14,9 +16,22 @@ import java.util.List;
 
 public class ServersTab extends JPanel {
 
-    private final JTable           table;
+    private static final int THUMB_W = 64;
+    private static final int THUMB_H = 64;
+    private static final int ROW_H   = THUMB_H + 2;
+
+    private final JTable            table;
     private final DefaultTableModel model;
-    private final Path             dbPath;
+    private final Path              dbPath;
+
+    private static final BufferedImage UNKNOWN_THUMBNAIL = loadUnknownThumbnail();
+
+    private static BufferedImage loadUnknownThumbnail() {
+        try (InputStream is = ServersTab.class.getResourceAsStream("/img/unknown.png")) {
+            if (is != null) return ImageIO.read(is);
+        } catch (Exception ignored) {}
+        return null;
+    }
 
     public static class Server {
         public String ip;
@@ -31,18 +46,18 @@ public class ServersTab extends JPanel {
                 ? Paths.get(varsData.getLceFolder(), "build", "Release", "servers.db")
                 : Paths.get("servers.db");
 
-        model = new DefaultTableModel(new Object[]{"Name", "IP", "Port"}, 0) {
+        model = new DefaultTableModel(new Object[]{"", "Name", "IP", "Port"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) { return false; }
+            @Override
+            public Class<?> getColumnClass(int col) {
+                return col == 0 ? ImageIcon.class : String.class;
+            }
         };
 
         table = new JTable(model);
 
-        DefaultTableCellRenderer headerRenderer = new DefaultTableCellRenderer();
-        headerRenderer.setHorizontalAlignment(SwingConstants.LEFT);
-        for (int i = 0; i < table.getColumnModel().getColumnCount(); i++)
-            table.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
-
+        table.setRowHeight(ROW_H);
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setFillsViewportHeight(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
@@ -51,13 +66,31 @@ public class ServersTab extends JPanel {
         table.setShowGrid(true);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
-        table.getColumnModel().getColumn(0).setPreferredWidth(500);
-        table.getColumnModel().getColumn(1).setPreferredWidth(60);
-        table.getColumnModel().getColumn(2).setPreferredWidth(30);
+
+        DefaultTableCellRenderer headerRenderer = new DefaultTableCellRenderer();
+        headerRenderer.setHorizontalAlignment(SwingConstants.LEFT);
+        for (int i = 0; i < table.getColumnModel().getColumnCount(); i++)
+            table.getColumnModel().getColumn(i).setHeaderRenderer(headerRenderer);
+
+        table.getColumnModel().getColumn(0).setPreferredWidth(THUMB_W);
+        table.getColumnModel().getColumn(0).setMaxWidth(THUMB_W);
+        table.getColumnModel().getColumn(0).setMinWidth(THUMB_W);
+        table.getColumnModel().getColumn(0).setCellRenderer((tbl, value, selected, focused, row, col) -> {
+            JLabel label = new JLabel();
+            label.setHorizontalAlignment(SwingConstants.CENTER);
+            label.setOpaque(true);
+            label.setBackground(selected ? tbl.getSelectionBackground() : new Color(30, 30, 30));
+            if (value instanceof ImageIcon icon) label.setIcon(icon);
+            return label;
+        });
+
+        table.getColumnModel().getColumn(1).setPreferredWidth(500);
+        table.getColumnModel().getColumn(2).setPreferredWidth(60);
+        table.getColumnModel().getColumn(3).setPreferredWidth(30);
 
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
         JButton addButton     = new JButton("Add");
         JButton editButton    = new JButton("Edit");
         JButton removeButton  = new JButton("Remove");
@@ -82,10 +115,16 @@ public class ServersTab extends JPanel {
         });
     }
 
+    private static ImageIcon scaledIcon(BufferedImage img) {
+        if (img == null) return null;
+        return new ImageIcon(img.getScaledInstance(THUMB_W, THUMB_H, Image.SCALE_SMOOTH));
+    }
+
     private void loadServers() {
         model.setRowCount(0);
+        ImageIcon icon = scaledIcon(UNKNOWN_THUMBNAIL);
         for (Server s : readServers())
-            model.addRow(new Object[]{s.name, s.ip, s.port});
+            model.addRow(new Object[]{icon, s.name, s.ip, s.port});
     }
 
     private void addServer() {
@@ -196,8 +235,6 @@ public class ServersTab extends JPanel {
         });
     }
 
-    // --- Binary servers.db read/write ---
-
     private List<Server> readServers() {
         List<Server> servers = new ArrayList<>();
         if (!Files.exists(dbPath)) return servers;
@@ -207,18 +244,16 @@ public class ServersTab extends JPanel {
             in.readFully(magic);
             if (!new String(magic).equals("MCSV")) return servers;
 
-            Integer.reverseBytes(in.readInt()); // version
-            int count = Integer.reverseBytes(in.readInt());
+            readIntLE(in);
+            int count = readIntLE(in);
 
             for (int i = 0; i < count; i++) {
-                int    ipLen    = Short.reverseBytes(in.readShort()) & 0xFFFF;
-                byte[] ipBytes  = new byte[ipLen];
+                byte[] ipBytes = new byte[readShortLE(in)];
                 in.readFully(ipBytes);
 
-                int port = Short.reverseBytes(in.readShort()) & 0xFFFF;
+                int port = readShortLE(in);
 
-                int    nameLen   = Short.reverseBytes(in.readShort()) & 0xFFFF;
-                byte[] nameBytes = new byte[nameLen];
+                byte[] nameBytes = new byte[readShortLE(in)];
                 in.readFully(nameBytes);
 
                 Server s = new Server();
@@ -238,21 +273,47 @@ public class ServersTab extends JPanel {
             Files.createDirectories(dbPath.getParent());
             try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(dbPath))) {
                 out.writeBytes("MCSV");
-                out.writeInt(Integer.reverseBytes(1));
-                out.writeInt(Integer.reverseBytes(servers.size()));
+                writeIntLE(out, 1);
+                writeIntLE(out, servers.size());
 
                 for (Server s : servers) {
                     byte[] ipBytes   = s.ip.getBytes();
                     byte[] nameBytes = s.name.getBytes();
-                    out.writeShort(Short.reverseBytes((short) ipBytes.length));
+                    writeShortLE(out, ipBytes.length);
                     out.write(ipBytes);
-                    out.writeShort(Short.reverseBytes((short) s.port));
-                    out.writeShort(Short.reverseBytes((short) nameBytes.length));
+                    writeShortLE(out, s.port);
+                    writeShortLE(out, nameBytes.length);
                     out.write(nameBytes);
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static int readShortLE(DataInputStream in) throws IOException {
+        int lo = in.readUnsignedByte();
+        int hi = in.readUnsignedByte();
+        return (hi << 8) | lo;
+    }
+
+    private static int readIntLE(DataInputStream in) throws IOException {
+        int b0 = in.readUnsignedByte();
+        int b1 = in.readUnsignedByte();
+        int b2 = in.readUnsignedByte();
+        int b3 = in.readUnsignedByte();
+        return (b3 << 24) | (b2 << 16) | (b1 << 8) | b0;
+    }
+
+    private static void writeShortLE(DataOutputStream out, int value) throws IOException {
+        out.writeByte(value & 0xFF);
+        out.writeByte((value >> 8) & 0xFF);
+    }
+
+    private static void writeIntLE(DataOutputStream out, int value) throws IOException {
+        out.writeByte(value & 0xFF);
+        out.writeByte((value >> 8) & 0xFF);
+        out.writeByte((value >> 16) & 0xFF);
+        out.writeByte((value >> 24) & 0xFF);
     }
 }
