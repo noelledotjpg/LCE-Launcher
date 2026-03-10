@@ -35,13 +35,13 @@ Head over to the [Releases](https://github.com/noelledotjpg/LCE-Launcher/release
 # Build/Run
 
 ### Requirements: 
-**Building Launcher**
+**Building (Launcher)**
 - An IDE such as Intellij IDEA
 - Java 21 JDK (Preferrably [Eclipse Temurin](https://adoptium.net/temurin/releases?version=21&os=any&arch=any))
 - Gradle (optional, can use the Gradle wrapper included)
 <br>
 
-**Building LCE (Setup)**
+**Building (LCE Setup)**
 - [Visual Studio 2022](https://aka.ms/vs/17/release/vs_community.exe)
 - [CMake](https://cmake.org/download/#latest) 
 
