@@ -2,7 +2,7 @@ TODO:
 [x] Parse world save data
 [x] Make sure all bg apps close
 [x] Fix preferences tab layout
-[ ] Add a way to rebuild/fetch from the latest releases
+[x] Add a way to rebuild/fetch from the latest releases
 [ ]
 
 TODO (Low Priority):

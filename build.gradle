@@ -1,12 +1,19 @@
 plugins {
     id 'java'
     id 'application'
-    id 'org.openjfx.javafxplugin' // handles JavaFX modules automatically
+    id 'org.openjfx.javafxplugin'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.noelledotjpg'
-version = '0.0.1'
+
+def extractVersion = {
+    def mainFile = file("src/main/java/com/noelledotjpg/Main.java")
+    def match = mainFile.text =~ /VERSION\s*=\s*"([^"]+)"/
+    return match ? match[0][1] : "0.0.0"
+}
+
+version = extractVersion()
 
 repositories {
     mavenCentral()
