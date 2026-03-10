@@ -1,7 +1,6 @@
 package com.noelledotjpg.TabContent;
 
-import com.google.gson.Gson;
-import com.noelledotjpg.BootstrapContent.VarsData;
+import com.noelledotjpg.Data.VarsData;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -15,57 +14,28 @@ import java.util.List;
 
 public class ServersTab extends JPanel {
 
-    private JTable table;
-    private DefaultTableModel model;
-    private JButton addButton, removeButton, editButton, refreshButton;
-
-    private Path dbPath;
-    private Gson gson = new Gson();
+    private final JTable           table;
+    private final DefaultTableModel model;
+    private final Path             dbPath;
 
     public static class Server {
         public String ip;
-        public int port;
+        public int    port;
         public String name;
-    }
-
-    private void setPlaceholder(JTextField field, String placeholder) {
-        field.setText(placeholder);
-        field.setForeground(Color.GRAY);
-
-        field.addFocusListener(new FocusAdapter() {
-            @Override
-            public void focusGained(FocusEvent e) {
-                if (field.getText().equals(placeholder)) {
-                    field.setText("");
-                    field.setForeground(Color.BLACK);
-                }
-            }
-
-            @Override
-            public void focusLost(FocusEvent e) {
-                if (field.getText().isEmpty()) {
-                    field.setText(placeholder);
-                    field.setForeground(Color.GRAY);
-                }
-            }
-        });
     }
 
     public ServersTab(VarsData varsData) {
         setLayout(new BorderLayout());
 
-        // Resolve servers.db path using vars.json LCE folder
-        if (varsData != null && varsData.getLceFolder() != null) {
-            dbPath = Paths.get(varsData.getLceFolder(), "build", "Release", "servers.db");
-        } else {
-            dbPath = Paths.get("servers.db"); // fallback
-        }
+        dbPath = (varsData != null && varsData.getLceFolder() != null)
+                ? Paths.get(varsData.getLceFolder(), "build", "Release", "servers.db")
+                : Paths.get("servers.db");
 
-        // Table setup
         model = new DefaultTableModel(new Object[]{"Name", "IP", "Port"}, 0) {
             @Override
             public boolean isCellEditable(int row, int column) { return false; }
         };
+
         table = new JTable(model);
 
         DefaultTableCellRenderer headerRenderer = new DefaultTableCellRenderer();
@@ -81,37 +51,30 @@ public class ServersTab extends JPanel {
         table.setShowGrid(true);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
-
-        table.getColumnModel().getColumn(0).setPreferredWidth(500); // Name
-        table.getColumnModel().getColumn(1).setPreferredWidth(60); // IP
-        table.getColumnModel().getColumn(2).setPreferredWidth(30);  // Port
+        table.getColumnModel().getColumn(0).setPreferredWidth(500);
+        table.getColumnModel().getColumn(1).setPreferredWidth(60);
+        table.getColumnModel().getColumn(2).setPreferredWidth(30);
 
         add(new JScrollPane(table), BorderLayout.CENTER);
 
-        // Buttons panel
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addButton = new JButton("Add");
-        removeButton = new JButton("Remove");
-        editButton = new JButton("Edit");
-        refreshButton = new JButton("Refresh");
-
+        JButton addButton     = new JButton("Add");
+        JButton editButton    = new JButton("Edit");
+        JButton removeButton  = new JButton("Remove");
+        JButton refreshButton = new JButton("Refresh");
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(removeButton);
         buttonPanel.add(refreshButton);
-
         add(buttonPanel, BorderLayout.SOUTH);
 
-        // Load existing servers
         loadServers();
 
-        // Button actions
         addButton.addActionListener(e -> addServer());
         editButton.addActionListener(e -> editServer());
         removeButton.addActionListener(e -> removeServer());
         refreshButton.addActionListener(e -> loadServers());
 
-        // Double-click edit
         table.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editServer();
@@ -121,10 +84,8 @@ public class ServersTab extends JPanel {
 
     private void loadServers() {
         model.setRowCount(0);
-        List<Server> servers = readServers();
-        for (Server s : servers) {
+        for (Server s : readServers())
             model.addRow(new Object[]{s.name, s.ip, s.port});
-        }
     }
 
     private void addServer() {
@@ -141,8 +102,7 @@ public class ServersTab extends JPanel {
         int row = table.getSelectedRow();
         if (row < 0) return;
         List<Server> servers = readServers();
-        Server old = servers.get(row);
-        Server updated = showServerDialog(old);
+        Server updated = showServerDialog(servers.get(row));
         if (updated != null) {
             servers.set(row, updated);
             writeServers(servers);
@@ -160,74 +120,84 @@ public class ServersTab extends JPanel {
     }
 
     private Server showServerDialog(Server server) {
-        JTextField ipField = new JTextField();
+        JTextField ipField   = new JTextField();
         JTextField portField = new JTextField();
         JTextField nameField = new JTextField();
 
-        // Placeholder texts
-        String ipPlaceholder = "e.g. 127.0.0.1";
-        String portPlaceholder = "25565"; // default port
-        String namePlaceholder = "Server Name";
+        final String IP_PLACEHOLDER   = "e.g. 127.0.0.1";
+        final String PORT_PLACEHOLDER = "25565";
+        final String NAME_PLACEHOLDER = "Server Name";
 
-        // Initialize fields
         if (server != null) {
             ipField.setText(server.ip);
             portField.setText(String.valueOf(server.port));
             nameField.setText(server.name);
-            ipField.setForeground(Color.BLACK);
-            portField.setForeground(Color.BLACK);
-            nameField.setForeground(Color.BLACK);
         } else {
-            setPlaceholder(ipField, ipPlaceholder);
-            setPlaceholder(portField, portPlaceholder);
-            setPlaceholder(nameField, namePlaceholder);
+            setPlaceholder(ipField,   IP_PLACEHOLDER);
+            setPlaceholder(portField, PORT_PLACEHOLDER);
+            setPlaceholder(nameField, NAME_PLACEHOLDER);
         }
 
         JPanel panel = new JPanel(new GridLayout(0, 1));
-        panel.add(new JLabel("IP:"));
-        panel.add(ipField);
-        panel.add(new JLabel("Port:"));
-        panel.add(portField);
-        panel.add(new JLabel("Name:"));
-        panel.add(nameField);
+        panel.add(new JLabel("IP:"));   panel.add(ipField);
+        panel.add(new JLabel("Port:")); panel.add(portField);
+        panel.add(new JLabel("Name:")); panel.add(nameField);
 
         int result = JOptionPane.showConfirmDialog(this, panel,
                 server == null ? "Add Server" : "Edit Server",
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 
-        if (result == JOptionPane.OK_OPTION) {
-            String ip = ipField.getText().trim();
-            int port;
-            String portText = portField.getText().trim();
+        if (result != JOptionPane.OK_OPTION) return null;
 
-            // Use default port if empty
-            if (portText.isEmpty() || portText.equals(portPlaceholder)) {
-                port = 25565;
-            } else {
-                try {
-                    port = Integer.parseInt(portText);
-                } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(this, "Invalid port number");
-                    return null;
-                }
-            }
+        String ip       = ipField.getText().trim();
+        String portText = portField.getText().trim();
+        String name     = nameField.getText().trim();
 
-            String name = nameField.getText().trim();
-            if (ip.isEmpty() || ip.equals(ipPlaceholder) || name.isEmpty() || name.equals(namePlaceholder)) {
-                JOptionPane.showMessageDialog(this, "IP and Name cannot be empty");
+        int port;
+        if (portText.isEmpty() || portText.equals(PORT_PLACEHOLDER)) {
+            port = 25565;
+        } else {
+            try {
+                port = Integer.parseInt(portText);
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid port number");
                 return null;
             }
-
-            Server s = new Server();
-            s.ip = ip;
-            s.port = port;
-            s.name = name;
-            return s;
         }
-        return null;
+
+        if (ip.isEmpty() || ip.equals(IP_PLACEHOLDER) || name.isEmpty() || name.equals(NAME_PLACEHOLDER)) {
+            JOptionPane.showMessageDialog(this, "IP and Name cannot be empty");
+            return null;
+        }
+
+        Server s = new Server();
+        s.ip   = ip;
+        s.port = port;
+        s.name = name;
+        return s;
     }
 
-    // --- Reading servers.db ---
+    private void setPlaceholder(JTextField field, String placeholder) {
+        field.setText(placeholder);
+        field.setForeground(Color.GRAY);
+        field.addFocusListener(new FocusAdapter() {
+            @Override public void focusGained(FocusEvent e) {
+                if (field.getText().equals(placeholder)) {
+                    field.setText("");
+                    field.setForeground(Color.BLACK);
+                }
+            }
+            @Override public void focusLost(FocusEvent e) {
+                if (field.getText().isEmpty()) {
+                    field.setText(placeholder);
+                    field.setForeground(Color.GRAY);
+                }
+            }
+        });
+    }
+
+    // --- Binary servers.db read/write ---
+
     private List<Server> readServers() {
         List<Server> servers = new ArrayList<>();
         if (!Files.exists(dbPath)) return servers;
@@ -237,29 +207,26 @@ public class ServersTab extends JPanel {
             in.readFully(magic);
             if (!new String(magic).equals("MCSV")) return servers;
 
-            int version = Integer.reverseBytes(in.readInt());
+            Integer.reverseBytes(in.readInt()); // version
             int count = Integer.reverseBytes(in.readInt());
 
             for (int i = 0; i < count; i++) {
-                int ipLen = Short.reverseBytes(in.readShort()) & 0xFFFF;
-                byte[] ipBytes = new byte[ipLen];
+                int    ipLen    = Short.reverseBytes(in.readShort()) & 0xFFFF;
+                byte[] ipBytes  = new byte[ipLen];
                 in.readFully(ipBytes);
-                String ip = new String(ipBytes);
 
                 int port = Short.reverseBytes(in.readShort()) & 0xFFFF;
 
-                int nameLen = Short.reverseBytes(in.readShort()) & 0xFFFF;
+                int    nameLen   = Short.reverseBytes(in.readShort()) & 0xFFFF;
                 byte[] nameBytes = new byte[nameLen];
                 in.readFully(nameBytes);
-                String name = new String(nameBytes);
 
                 Server s = new Server();
-                s.ip = ip;
+                s.ip   = new String(ipBytes);
                 s.port = port;
-                s.name = name;
+                s.name = new String(nameBytes);
                 servers.add(s);
             }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -275,14 +242,11 @@ public class ServersTab extends JPanel {
                 out.writeInt(Integer.reverseBytes(servers.size()));
 
                 for (Server s : servers) {
-                    byte[] ipBytes = s.ip.getBytes();
+                    byte[] ipBytes   = s.ip.getBytes();
                     byte[] nameBytes = s.name.getBytes();
-
                     out.writeShort(Short.reverseBytes((short) ipBytes.length));
                     out.write(ipBytes);
-
                     out.writeShort(Short.reverseBytes((short) s.port));
-
                     out.writeShort(Short.reverseBytes((short) nameBytes.length));
                     out.write(nameBytes);
                 }

@@ -2,6 +2,8 @@ package com.noelledotjpg.TabContent;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.noelledotjpg.Data.AppPaths;
+import com.noelledotjpg.Data.PreferencesData;
 import com.noelledotjpg.MainContent.LaunchArguments;
 
 import javax.swing.*;
@@ -11,14 +13,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.function.Consumer;
 
 public class PreferencesTab extends JPanel {
-
-    private static final Path PREFS_JSON =
-            Paths.get("src/main/resources/data/launcher/preferences.json");
 
     private static final int LABEL_WIDTH = 200;
     private static final int FIELD_WIDTH = 220;
@@ -26,11 +23,11 @@ public class PreferencesTab extends JPanel {
     private static final int SECTION_GAP = 16;
     private static final int ROW_GAP     = 8;
 
-    private final String            exePath;
-    private final PreferencesData   prefs;
-    private final Gson              gson = new GsonBuilder().setPrettyPrinting().create();
+    private final String          exePath;
+    private final PreferencesData prefs;
+    private final Gson            gson = new GsonBuilder().setPrettyPrinting().create();
     private final JComboBox<String> profileCombo;
-    private final LaunchArguments   launchArgs;
+    private final LaunchArguments launchArgs;
 
     public PreferencesTab(PreferencesData prefs, JComboBox<String> profileCombo,
                           LaunchArguments launchArgs, String exePath) {
@@ -107,7 +104,6 @@ public class PreferencesTab extends JPanel {
         combo.setPreferredSize(new Dimension(120, 21));
         combo.setMaximumSize(new Dimension(200, 21));
         combo.addActionListener(e -> onChange.accept((String) combo.getSelectedItem()));
-
         JLabel label = new JLabel(labelText);
         label.setLabelFor(combo);
         row.add(fixedLabel(label));
@@ -177,8 +173,8 @@ public class PreferencesTab extends JPanel {
 
     private void save() {
         try {
-            Files.createDirectories(PREFS_JSON.getParent());
-            try (Writer w = Files.newBufferedWriter(PREFS_JSON)) {
+            Files.createDirectories(AppPaths.PREFERENCES_JSON.getParent());
+            try (Writer w = Files.newBufferedWriter(AppPaths.PREFERENCES_JSON)) {
                 gson.toJson(prefs, w);
             }
         } catch (Exception e) {

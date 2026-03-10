@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.noelledotjpg.BootstrapContent.LCESetup;
 import com.noelledotjpg.BootstrapContent.SetupPaths;
-import com.noelledotjpg.BootstrapContent.VarsData;
+import com.noelledotjpg.Data.VarsData;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;

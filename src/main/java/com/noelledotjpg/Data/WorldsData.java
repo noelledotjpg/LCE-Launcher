@@ -1,4 +1,4 @@
-package com.noelledotjpg.TabContent;
+package com.noelledotjpg.Data;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -15,8 +15,6 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 public class WorldsData {
-
-    // Fields
 
     private BufferedImage thumbnail = null;
     private String name     = "Unknown World";
@@ -43,8 +41,6 @@ public class WorldsData {
         GAMEMODE_NAMES.put(3, "Spectator");
     }
 
-    // Construction
-
     public WorldsData(Path folder) {
         this.folder = folder;
         try {
@@ -55,7 +51,7 @@ public class WorldsData {
         populateFileInfo(folder);
     }
 
-    // Save parsing
+    // --- Save parsing ---
 
     private void parse(Path saveFile) throws Exception {
         if (!Files.exists(saveFile)) return;
@@ -68,9 +64,6 @@ public class WorldsData {
         parseLevelDat(levelDat.getBytes());
     }
 
-
-    // decompression (LCE header, standard zlib)
-
     private static byte[] decompress(byte[] raw) throws IOException {
         if (raw.length < 8) throw new IOException("File too short");
 
@@ -78,8 +71,7 @@ public class WorldsData {
         int saveVer    = hdr.getInt();
         int decompSize = hdr.getInt();
 
-        if (saveVer != 0)
-            throw new IOException("Unexpected saveVer: " + saveVer);
+        if (saveVer != 0) throw new IOException("Unexpected saveVer: " + saveVer);
 
         try {
             byte[] out = new byte[decompSize];
@@ -127,7 +119,7 @@ public class WorldsData {
         final String name;
         final int    startOffset;
         final int    length;
-        final byte[] blob;  // shared reference into decompressed data
+        final byte[] blob;
 
         VirtualFile(String name, int startOffset, int length, byte[] blob) {
             this.name        = name;
@@ -192,7 +184,6 @@ public class WorldsData {
      *
      * @see <a href="https://wiki.vg/NBT">NBT format specification</a>
      */
-
     private void parseLevelDat(byte[] nbt) throws IOException {
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(nbt));
         byte rootTag = dis.readByte();
@@ -212,39 +203,38 @@ public class WorldsData {
 
     private void readPayload(DataInputStream dis, byte tag, String tagName) throws IOException {
         switch (tag) {
-            case 1  -> {                                        // TAG_Byte
+            case 1  -> {
                 byte v = dis.readByte();
                 if ("hardcore".equals(tagName) && v == 1) gamemode = "Hardcore";
             }
-            case 2  -> dis.readShort();                        // TAG_Short
-            case 3  -> {                                        // TAG_Int
+            case 2  -> dis.readShort();
+            case 3  -> {
                 int v = dis.readInt();
                 if ("GameType".equals(tagName))
                     gamemode = GAMEMODE_NAMES.getOrDefault(v, String.valueOf(v));
             }
-            case 4  -> {                                        // TAG_Long
+            case 4  -> {
                 long v = dis.readLong();
                 if ("RandomSeed".equals(tagName)) seed = String.valueOf(v);
             }
-            case 5  -> dis.readFloat();                        // TAG_Float
-            case 6  -> dis.readDouble();                       // TAG_Double
-            case 7  -> dis.skipBytes(dis.readInt());           // TAG_Byte_Array
-            case 8  -> {                                        // TAG_String
+            case 5  -> dis.readFloat();
+            case 6  -> dis.readDouble();
+            case 7  -> dis.skipBytes(dis.readInt());
+            case 8  -> {
                 String v = readNbtString(dis);
                 if ("LevelName".equals(tagName)) name = v;
             }
-            case 9  -> {                                        // TAG_List
+            case 9  -> {
                 byte elemTag = dis.readByte();
                 int  count   = dis.readInt();
                 for (int i = 0; i < count; i++) readPayload(dis, elemTag, "");
             }
-            case 10 -> readCompound(dis);                      // TAG_Compound
-            case 11 -> dis.skipBytes(dis.readInt() * 4);       // TAG_Int_Array
+            case 10 -> readCompound(dis);
+            case 11 -> dis.skipBytes(dis.readInt() * 4);
             default -> throw new IOException("Unknown NBT tag: " + tag + " ('" + tagName + "')");
         }
     }
 
-    /** NBT strings: uint16 big-endian byte-length, then UTF-8. */
     private static String readNbtString(DataInputStream dis) throws IOException {
         int len = dis.readUnsignedShort();
         byte[] bytes = new byte[len];
@@ -256,7 +246,7 @@ public class WorldsData {
         dis.skipBytes(dis.readUnsignedShort());
     }
 
-    // metadata
+    // --- Metadata ---
 
     private void populateFileInfo(Path folder) {
         try {
@@ -272,7 +262,6 @@ public class WorldsData {
             size    = "0 MB";
             created = "Unknown";
         }
-
         thumbnail = loadThumbnail(folder);
     }
 
@@ -283,12 +272,8 @@ public class WorldsData {
      *   <li>JPEG embedded inside the save file itself</li>
      *   <li>{@code /img/unknown.png} from the classpath as a fallback</li>
      * </ol>
-     *
-     * @param folder the world folder containing {@code saveData.ms}
-     * @return a thumbnail image, never {@code null} (falls back to unknown.png)
      */
     private static BufferedImage loadThumbnail(Path folder) {
-        // 1. Sidecar files (Xbox One / PC builds may write these)
         for (String candidate : new String[]{
                 "thumbnail.jpg", "thumbnail.png",
                 "screenshot.jpg", "screenshot.png",
@@ -302,13 +287,11 @@ public class WorldsData {
             } catch (Exception ignored) {}
         }
 
-        // 2. JPEG embedded in saveData.ms
         try {
             BufferedImage embedded = extractThumbnailFromSave(folder.resolve("saveData.ms"));
             if (embedded != null) return embedded;
         } catch (Exception ignored) {}
 
-        // 3. Fallback
         return UNKNOWN_THUMBNAIL;
     }
 
@@ -318,21 +301,16 @@ public class WorldsData {
      * <p>On Xbox One builds, thumbnails are managed by the platform's
      * StorageManager and are not guaranteed to be present inside
      * {@code saveData.ms}. Returns {@code null} when none is found.
-     *
-     * @param saveFile path to {@code saveData.ms}
-     * @return decoded thumbnail, or {@code null} if none found
      */
     private static BufferedImage extractThumbnailFromSave(Path saveFile) throws Exception {
         if (!Files.exists(saveFile)) return null;
 
         byte[] data = decompress(Files.readAllBytes(saveFile));
+        byte[] soi  = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+        byte[] eoi  = {(byte) 0xFF, (byte) 0xD9};
 
-        // Search for JPEG SOI marker (FF D8 FF)
-        byte[] soi = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
         int idx = indexOf(data, soi, 0);
         while (idx != -1) {
-            // Find matching EOI marker (FF D9)
-            byte[] eoi = {(byte) 0xFF, (byte) 0xD9};
             int end = indexOf(data, eoi, idx);
             if (end == -1) break;
 
@@ -348,7 +326,6 @@ public class WorldsData {
         return null;
     }
 
-    /** Find the first occurrence of {@code needle} in {@code data} at or after {@code from}. */
     private static int indexOf(byte[] data, byte[] needle, int from) {
         outer:
         for (int i = from; i <= data.length - needle.length; i++) {

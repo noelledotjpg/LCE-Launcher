@@ -1,6 +1,9 @@
 package com.noelledotjpg.TabContent;
 
 import com.google.gson.Gson;
+import com.noelledotjpg.Data.AppPaths;
+import com.noelledotjpg.Data.PlaytimeTracker;
+import com.noelledotjpg.Data.ProfilesData;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -9,36 +12,32 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class ProfileEditorTab extends JPanel {
 
-    private final HashMap<String, String> timePlayedMap = new HashMap<>();
-    private ProfilesData profilesData;
-    private Gson gson;
-    private PlaytimeTracker playtimeTracker;
-    private Runnable onProfilesChanged;
-    private DefaultTableModel tableModel;
-    private JTable profileTable;
+    private final ProfilesData    profilesData;
+    private final Gson            gson;
+    private final PlaytimeTracker playtimeTracker;
+    private       Runnable        onProfilesChanged;
+    private final DefaultTableModel tableModel;
+    private final JTable          profileTable;
 
-    public ProfileEditorTab(ArrayList<String> profiles, PlaytimeTracker tracker, ProfilesData profilesData, Gson gson) {
+    public ProfileEditorTab(ArrayList<String> profiles, PlaytimeTracker tracker,
+                            ProfilesData profilesData, Gson gson) {
         this.playtimeTracker = tracker;
-        this.profilesData = profilesData;
-        this.gson = gson;
+        this.profilesData    = profilesData;
+        this.gson            = gson;
 
         setLayout(new BorderLayout());
 
         tableModel = new DefaultTableModel(new Object[]{"Profile", "Time Played"}, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+            public boolean isCellEditable(int row, int column) { return false; }
         };
 
         profileTable = new JTable(tableModel);
+
         DefaultTableCellRenderer headerRenderer = new DefaultTableCellRenderer();
         headerRenderer.setHorizontalAlignment(SwingConstants.LEFT);
         for (int i = 0; i < profileTable.getColumnModel().getColumnCount(); i++)
@@ -52,15 +51,14 @@ public class ProfileEditorTab extends JPanel {
         profileTable.setShowGrid(true);
         profileTable.setShowHorizontalLines(true);
         profileTable.setShowVerticalLines(false);
-
         profileTable.getColumnModel().getColumn(0).setPreferredWidth(700);
         profileTable.getColumnModel().getColumn(1).setPreferredWidth(60);
 
         add(new JScrollPane(profileTable), BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        JButton addButton = new JButton("Add");
-        JButton editButton = new JButton("Edit");
+        JButton addButton    = new JButton("Add");
+        JButton editButton   = new JButton("Edit");
         JButton removeButton = new JButton("Remove");
         editButton.setEnabled(false);
         removeButton.setEnabled(false);
@@ -68,7 +66,6 @@ public class ProfileEditorTab extends JPanel {
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
         buttonPanel.add(removeButton);
-
         add(buttonPanel, BorderLayout.SOUTH);
 
         setProfiles(profiles);
@@ -85,10 +82,8 @@ public class ProfileEditorTab extends JPanel {
 
         profileTable.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    int row = profileTable.getSelectedRow();
-                    if (row >= 0) openProfileEditorWindow(row);
-                }
+                if (e.getClickCount() == 2 && profileTable.getSelectedRow() >= 0)
+                    openProfileEditorWindow(profileTable.getSelectedRow());
             }
         });
     }
@@ -97,11 +92,10 @@ public class ProfileEditorTab extends JPanel {
         this.onProfilesChanged = callback;
     }
 
-    private void saveProfilesJSON() {
+    private void saveProfiles() {
         try {
-            Path PROFILES_JSON = Paths.get("src/main/resources/data/usernames.json");
-            Files.createDirectories(PROFILES_JSON.getParent());
-            try (Writer writer = Files.newBufferedWriter(PROFILES_JSON)) {
+            Files.createDirectories(AppPaths.PROFILES_JSON.getParent());
+            try (Writer writer = Files.newBufferedWriter(AppPaths.PROFILES_JSON)) {
                 gson.toJson(profilesData, writer);
             }
         } catch (IOException ex) {
@@ -113,16 +107,12 @@ public class ProfileEditorTab extends JPanel {
         if (name == null || name.isBlank()) return;
 
         tableModel.addRow(new Object[]{name, "0h 0m"});
-        timePlayedMap.put(name, "0h 0m");
-
-        if (playtimeTracker != null) playtimeTracker.registerProfile(name);
-
+        playtimeTracker.registerProfile(name);
         profilesData.getUsernames().add(name);
         profilesData.setLastUsed(name);
-        saveProfilesJSON();
+        saveProfiles();
 
         profileTable.setRowSelectionInterval(tableModel.getRowCount() - 1, tableModel.getRowCount() - 1);
-
         if (onProfilesChanged != null) onProfilesChanged.run();
     }
 
@@ -130,12 +120,10 @@ public class ProfileEditorTab extends JPanel {
         if (idx < 0 || idx >= tableModel.getRowCount()) return;
 
         String name = (String) tableModel.getValueAt(idx, 0);
-        timePlayedMap.remove(name);
-        if (playtimeTracker != null) playtimeTracker.unregisterProfile(name);
-
+        playtimeTracker.unregisterProfile(name);
         tableModel.removeRow(idx);
         profilesData.getUsernames().remove(name);
-        saveProfilesJSON();
+        saveProfiles();
 
         if (onProfilesChanged != null) onProfilesChanged.run();
     }
@@ -147,14 +135,11 @@ public class ProfileEditorTab extends JPanel {
         if (oldName.equals(newName)) return;
 
         tableModel.setValueAt(newName, idx, 0);
-        timePlayedMap.put(newName, timePlayedMap.remove(oldName));
-
-        if (playtimeTracker != null) playtimeTracker.renameProfile(oldName, newName);
-
+        playtimeTracker.renameProfile(oldName, newName);
         profilesData.getUsernames().set(idx, newName);
         if (oldName.equals(profilesData.getLastUsed())) profilesData.setLastUsed(newName);
 
-        saveProfilesJSON();
+        saveProfiles();
         if (onProfilesChanged != null) onProfilesChanged.run();
     }
 
@@ -163,28 +148,6 @@ public class ProfileEditorTab extends JPanel {
         if (name != null && !name.isBlank()) {
             addProfile(name);
             return name;
-        }
-        return null;
-    }
-
-    public String showEditProfileDialog(Component parent, String oldName) {
-        int idx = -1;
-        for (int i = 0; i < tableModel.getRowCount(); i++) {
-            if (tableModel.getValueAt(i, 0).equals(oldName)) {
-                idx = i;
-                break;
-            }
-        }
-        if (idx < 0) return null;
-
-        JTextField usernameField = new JTextField(oldName);
-        int result = JOptionPane.showConfirmDialog(parent, usernameField, "Edit profile name", JOptionPane.OK_CANCEL_OPTION);
-        if (result == JOptionPane.OK_OPTION) {
-            String newUsername = usernameField.getText().trim();
-            if (!newUsername.isEmpty() && !newUsername.equals(oldName)) {
-                renameProfile(idx, newUsername);
-                return newUsername;
-            }
         }
         return null;
     }
@@ -199,15 +162,13 @@ public class ProfileEditorTab extends JPanel {
     public void setProfiles(ArrayList<String> profiles) {
         tableModel.setRowCount(0);
         for (String profile : profiles) {
-            String time = playtimeTracker.getPlaytime(profile);
-            tableModel.addRow(new Object[]{profile, time});
+            tableModel.addRow(new Object[]{profile, playtimeTracker.getPlaytime(profile)});
             playtimeTracker.registerProfile(profile);
         }
     }
 
     public void setTimePlayed(String profile, int hours, int minutes) {
         String time = hours + "h " + minutes + "m";
-        timePlayedMap.put(profile, time);
         for (int i = 0; i < tableModel.getRowCount(); i++) {
             if (tableModel.getValueAt(i, 0).equals(profile)) {
                 tableModel.setValueAt(time, i, 1);
@@ -219,17 +180,13 @@ public class ProfileEditorTab extends JPanel {
     public void openProfileEditorWindow(int idx) {
         if (idx < 0 || idx >= tableModel.getRowCount()) return;
 
-        String username = (String) tableModel.getValueAt(idx, 0);
+        String username   = (String) tableModel.getValueAt(idx, 0);
         String timePlayed = (String) tableModel.getValueAt(idx, 1);
 
         JFrame editorFrame = new JFrame("Profile Editor");
-
         try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/img/favicon.png"));
-            editorFrame.setIconImage(icon.getImage());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            editorFrame.setIconImage(new ImageIcon(getClass().getResource("/img/favicon.png")).getImage());
+        } catch (Exception ignored) {}
 
         editorFrame.setSize(400, 440);
         editorFrame.setLocationRelativeTo(null);
@@ -243,22 +200,16 @@ public class ProfileEditorTab extends JPanel {
         profileInfo.setBorder(BorderFactory.createTitledBorder("Profile Info"));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill   = GridBagConstraints.HORIZONTAL;
 
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weightx = 0;
+        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0;
         profileInfo.add(new JLabel("Username:"), gbc);
 
-        gbc.gridx = 1;
-        gbc.weightx = 1;
+        gbc.gridx = 1; gbc.weightx = 1;
         JTextField usernameField = new JTextField(username);
         profileInfo.add(usernameField, gbc);
 
-        gbc.gridx = 0;
-        gbc.gridy = 1;
-        gbc.gridwidth = 2;
-        gbc.weightx = 0;
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 0;
         profileInfo.add(new JLabel("Time Played: " + timePlayed), gbc);
 
         mainPanel.add(profileInfo);
@@ -285,9 +236,8 @@ public class ProfileEditorTab extends JPanel {
         saveButton.setPreferredSize(new Dimension(120, 21));
         saveButton.addActionListener(ev -> {
             String newUsername = usernameField.getText().trim();
-            if (!newUsername.isEmpty() && !newUsername.equals(username)) {
+            if (!newUsername.isEmpty() && !newUsername.equals(username))
                 renameProfile(idx, newUsername);
-            }
             editorFrame.dispose();
         });
         buttonsPanel.add(saveButton, BorderLayout.EAST);

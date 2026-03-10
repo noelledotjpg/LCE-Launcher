@@ -1,4 +1,4 @@
-package com.noelledotjpg.TabContent;
+package com.noelledotjpg.Data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -8,8 +8,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -17,12 +15,10 @@ import java.util.Map;
 
 public class PlaytimeTracker {
 
-    private static final Path PLAYTIME_JSON = Paths.get("src/main/resources/data/playtime.json");
-
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private Map<String, String> playtimeMap;
     private Instant startTime;
-    private String currentProfile;
+    private String  currentProfile;
 
     public PlaytimeTracker() {
         loadPlaytime();
@@ -40,78 +36,38 @@ public class PlaytimeTracker {
 
     public void renameProfile(String oldName, String newName) {
         if (playtimeMap.containsKey(oldName)) {
-            String time = playtimeMap.remove(oldName);
-            playtimeMap.put(newName, time);
+            playtimeMap.put(newName, playtimeMap.remove(oldName));
             savePlaytime();
         }
     }
 
-    private void loadPlaytime() {
-        try {
-
-            if (Files.exists(PLAYTIME_JSON)) {
-
-                try (Reader reader = Files.newBufferedReader(PLAYTIME_JSON)) {
-
-                    playtimeMap = gson.fromJson(reader,
-                            new TypeToken<Map<String, String>>(){}.getType());
-
-                    if (playtimeMap == null)
-                        playtimeMap = new HashMap<>();
-                }
-
-            } else {
-
-                playtimeMap = new HashMap<>();
-
-            }
-
-        } catch (IOException e) {
-
-            e.printStackTrace();
-            playtimeMap = new HashMap<>();
-
-        }
-    }
-
     public void syncProfiles(Iterable<String> profiles) {
-
-        Map<String,String> newMap = new HashMap<>();
-
-        for (String profile : profiles) {
-
-            newMap.put(profile, playtimeMap.getOrDefault(profile,"0h 0m"));
-
-        }
-
+        Map<String, String> newMap = new HashMap<>();
+        for (String profile : profiles)
+            newMap.put(profile, playtimeMap.getOrDefault(profile, "0h 0m"));
         playtimeMap = newMap;
-
         savePlaytime();
     }
 
     public void startSession(String profile) {
         currentProfile = profile;
-        startTime = Instant.now();
+        startTime      = Instant.now();
     }
 
     public void endSession() {
         if (currentProfile == null || startTime == null) return;
 
-        Instant endTime = Instant.now();
-        Duration elapsed = Duration.between(startTime, endTime);
-
-        long hours = elapsed.toHours();
+        Duration elapsed = Duration.between(startTime, Instant.now());
+        long hours   = elapsed.toHours();
         long minutes = elapsed.toMinutes() % 60;
 
-        String newTime = hours + "h " + minutes + "m";
-
-        String previousTime = playtimeMap.getOrDefault(currentProfile, "0h 0m");
-        String accumulated = accumulateTime(previousTime, newTime);
+        String previous   = playtimeMap.getOrDefault(currentProfile, "0h 0m");
+        String accumulated = accumulateTime(previous, hours + "h " + minutes + "m");
 
         playtimeMap.put(currentProfile, accumulated);
         savePlaytime();
 
-        startTime = null;
+        startTime      = null;
         currentProfile = null;
     }
 
@@ -119,10 +75,26 @@ public class PlaytimeTracker {
         return playtimeMap.getOrDefault(profile, "0h 0m");
     }
 
+    private void loadPlaytime() {
+        try {
+            if (Files.exists(AppPaths.PLAYTIME_JSON)) {
+                try (Reader reader = Files.newBufferedReader(AppPaths.PLAYTIME_JSON)) {
+                    playtimeMap = gson.fromJson(reader, new TypeToken<Map<String, String>>(){}.getType());
+                    if (playtimeMap == null) playtimeMap = new HashMap<>();
+                }
+            } else {
+                playtimeMap = new HashMap<>();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            playtimeMap = new HashMap<>();
+        }
+    }
+
     private void savePlaytime() {
         try {
-            Files.createDirectories(PLAYTIME_JSON.getParent());
-            try (Writer writer = Files.newBufferedWriter(PLAYTIME_JSON)) {
+            Files.createDirectories(AppPaths.PLAYTIME_JSON.getParent());
+            try (Writer writer = Files.newBufferedWriter(AppPaths.PLAYTIME_JSON)) {
                 gson.toJson(playtimeMap, writer);
             }
         } catch (IOException e) {
@@ -133,13 +105,12 @@ public class PlaytimeTracker {
     private String accumulateTime(String previous, String added) {
         int prevH = Integer.parseInt(previous.split("h")[0].trim());
         int prevM = Integer.parseInt(previous.split("h")[1].replace("m", "").trim());
-
-        int addH = Integer.parseInt(added.split("h")[0].trim());
-        int addM = Integer.parseInt(added.split("h")[1].replace("m", "").trim());
+        int addH  = Integer.parseInt(added.split("h")[0].trim());
+        int addM  = Integer.parseInt(added.split("h")[1].replace("m", "").trim());
 
         int totalMinutes = prevM + addM;
-        int totalHours = prevH + addH + totalMinutes / 60;
-        totalMinutes = totalMinutes % 60;
+        int totalHours   = prevH + addH + totalMinutes / 60;
+        totalMinutes     = totalMinutes % 60;
 
         return totalHours + "h " + totalMinutes + "m";
     }

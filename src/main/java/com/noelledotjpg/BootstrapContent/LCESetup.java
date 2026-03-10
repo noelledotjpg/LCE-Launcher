@@ -1,6 +1,7 @@
 package com.noelledotjpg.BootstrapContent;
 
 import com.google.gson.GsonBuilder;
+import com.noelledotjpg.Data.VarsData;
 
 import java.io.*;
 import java.nio.file.*;
