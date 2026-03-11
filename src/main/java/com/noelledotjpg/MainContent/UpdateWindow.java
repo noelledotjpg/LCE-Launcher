@@ -1,5 +1,6 @@
 package com.noelledotjpg.MainContent;
 
+import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.UpdateChecker;
 import com.noelledotjpg.Data.UpdateChecker.NightlyInfo;
 
@@ -36,8 +37,7 @@ public class UpdateWindow {
 
     private static String readSkippedHash() {
         try {
-            java.io.File f = new java.io.File(
-                    com.noelledotjpg.BootstrapContent.SetupPaths.VARS_JSON);
+            java.io.File f = AppPaths.VARS_JSON.toFile();
             if (!f.exists()) return null;
             com.noelledotjpg.Data.VarsData vars = new com.google.gson.Gson()
                     .fromJson(java.nio.file.Files.readString(f.toPath()),
@@ -50,8 +50,7 @@ public class UpdateWindow {
 
     private static void writeSkippedHash(String hash) {
         try {
-            java.io.File f = new java.io.File(
-                    com.noelledotjpg.BootstrapContent.SetupPaths.VARS_JSON);
+            java.io.File f = AppPaths.VARS_JSON.toFile();
             if (!f.exists()) return;
             com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
             com.noelledotjpg.Data.VarsData vars;
@@ -255,8 +254,7 @@ public class UpdateWindow {
 
         private String readLceFolder() {
             try {
-                java.io.File f = new java.io.File(
-                        com.noelledotjpg.BootstrapContent.SetupPaths.VARS_JSON);
+                java.io.File f = AppPaths.VARS_JSON.toFile();
                 if (!f.exists()) return null;
                 com.noelledotjpg.Data.VarsData vars = new com.google.gson.Gson()
                         .fromJson(java.nio.file.Files.readString(f.toPath()),
@@ -269,8 +267,7 @@ public class UpdateWindow {
 
         private void writeUpdatedHash(String newHash) {
             try {
-                java.io.File f = new java.io.File(
-                        com.noelledotjpg.BootstrapContent.SetupPaths.VARS_JSON);
+                java.io.File f = AppPaths.VARS_JSON.toFile();
                 if (!f.exists()) return;
 
                 com.google.gson.Gson gson =

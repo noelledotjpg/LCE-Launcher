@@ -69,3 +69,32 @@ task BuildJar {
     description = 'Cleans and builds the shadow JAR'
     dependsOn 'clean', 'shadowJar'
 }
+
+task packageMsi(type: Exec) {
+    group = 'build'
+    description = 'Packages the app as a Windows .msi installer using jpackage'
+    dependsOn clean, shadowJar
+
+    doFirst {
+        delete "$buildDir/jpackage"
+    }
+
+    commandLine 'jpackage',
+            '--input', "${buildDir}/libs",
+            '--name', 'LCELauncher',
+            '--main-jar', "LCE-Launcher-${version}-WIN64.jar",
+            '--main-class', 'com.noelledotjpg.Bootstrap',
+            '--type', 'msi',
+            '--app-version', version,
+            '--dest', "${buildDir}/jpackage",
+            '--icon', 'src/main/resources/img/favicon.ico',
+            '--win-per-user-install',
+            '--vendor', 'noelledotjpg',
+            '--description', 'A launcher for a certain block game',
+            '--win-dir-chooser',         // lets user pick install folder
+            '--win-shortcut',            // desktop shortcut
+            '--win-shortcut-prompt',     // asks user if they want the shortcut
+            '--win-menu',                // adds to Start Menu
+            '--win-menu-group', 'LCE Launcher',
+            '--install-dir', 'LCELauncher'  // controls the folder name under Program Files
+}

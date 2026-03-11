@@ -15,6 +15,46 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
+/**
+ *
+ * Save file format (after stripping the 8-byte LCE header and zlib-inflating):
+ *
+ *   Global header (first 12 bytes of decompressed data):
+ *     [0]  uint32 LE  startOfNextData  — byte offset where file table begins
+ *     [4]  uint16 LE  numFiles
+ *     [6]  uint16 LE  unknown
+ *     [8]  uint16 LE  unknown (9 in tested saves)
+ *     [10] uint16 LE  unknown (9)
+ *
+ *   File table (at startOfNextData, 144 bytes per entry):
+ *     [0]   wchar_t[64]  filename, null-padded UTF-16LE (128 bytes)
+ *     [128] uint32 LE    length       — byte count of file content
+ *     [132] uint32 LE    startOffset  — byte offset into decompressed blob
+ *     [136] uint32 LE    field2       — likely last-modified timestamp
+ *     [140] uint32 LE    field3       — 0xC34 on all populated entries
+ *
+ *   LCE header prepended before zlib data:
+ *     [0] uint32 LE  saveVer (always 0)
+ *     [4] uint32 LE  decompressed size
+ *
+ * level.dat is standard uncompressed NBT with UTF-8 strings and big-endian
+ * integers. All fields including GameType and LevelName live inside a nested
+ * TAG_Compound named "Data" one level below the root compound.
+ *
+ *   NBT tag types:
+ *     0  TAG_End         (none - terminates TAG_Compound)
+ *     1  TAG_Byte        1 byte
+ *     2  TAG_Short       2 bytes, big-endian
+ *     3  TAG_Int         4 bytes, big-endian
+ *     4  TAG_Long        8 bytes, big-endian
+ *     5  TAG_Float       4 bytes, big-endian
+ *     6  TAG_Double      8 bytes, big-endian
+ *     7  TAG_Byte_Array  int32 length + n bytes
+ *     8  TAG_String      uint16 length + UTF-8 bytes
+ *     9  TAG_List        byte elemType + int32 count + n payloads
+ *    10  TAG_Compound    repeated (tag + name + payload) until TAG_End
+ *    11  TAG_Int_Array   int32 length + n * 4 bytes
+ */
 public class WorldsData {
 
     private BufferedImage thumbnail = null;
@@ -42,6 +82,9 @@ public class WorldsData {
         GAMEMODE_NAMES.put(3, "Spectator");
     }
 
+    private static final int ENTRY_SIZE  = 144;
+    private static final int FNAME_BYTES = 128;
+
     public WorldsData(Path folder) {
         this.folder = folder;
         try {
@@ -51,8 +94,6 @@ public class WorldsData {
         }
         populateFileInfo(folder);
     }
-
-    // save parsing
 
     private void parse(Path saveFile) throws Exception {
         if (!Files.exists(saveFile)) return;
@@ -64,8 +105,6 @@ public class WorldsData {
         }
         parseLevelDat(levelDat.getBytes());
     }
-
-    // decompression
 
     private static byte[] decompress(byte[] raw) throws IOException {
         if (raw.length < 8) throw new IOException("File too short");
@@ -103,42 +142,13 @@ public class WorldsData {
         }
         def.end();
 
-        // prepend LCE header: saveVer=0 (LE u32) + decompressedSize (LE u32)
         byte[] compressed = baos.toByteArray();
         ByteBuffer out = ByteBuffer.allocate(8 + compressed.length).order(ByteOrder.LITTLE_ENDIAN);
-        out.putInt(0);            // saveVer
-        out.putInt(data.length);  // decompressed size
+        out.putInt(0);
+        out.putInt(data.length);
         out.put(compressed);
         return out.array();
     }
-
-    /**
-     * Virtual filesystem layout
-     *
-     * <p><b>Global header</b> (first 12 bytes of decompressed data):
-     * <pre>
-     * Offset  Type        Description
-     * ------  ----------  ---------------------------
-     *  [0]    uint32 LE   startOfNextData (byte offset where file table begins)
-     *  [4]    uint16 LE   numFiles
-     *  [6]    uint16 LE   unknown
-     *  [8]    uint16 LE   unknown (9 in tested saves)
-     *  [10]   uint16 LE   unknown (9)
-     * </pre>
-     *
-     * <p><b>File table</b> (at {@code startOfNextData}, 144 bytes per entry):
-     * <pre>
-     * Offset  Type        Description
-     * ------  ----------  ---------------------------
-     *  [0]    wchar_t[64] filename, null-padded UTF-16LE (128 bytes)
-     *  [128]  uint32 LE   length       - byte count of file content
-     *  [132]  uint32 LE   startOffset  - byte offset into decompressed blob
-     *  [136]  uint32 LE   field2       - likely last-modified timestamp
-     *  [140]  uint32 LE   field3       - 0xC34 on all populated entries
-     * </pre>
-     */
-    private static final int ENTRY_SIZE  = 144;
-    private static final int FNAME_BYTES = 128;
 
     private static class VirtualFile {
         final String name;
@@ -186,15 +196,13 @@ public class WorldsData {
         return null;
     }
 
-    // save patching
-
     public void rename(String newName) throws IOException {
         byte[] nameBytes = newName.getBytes(StandardCharsets.UTF_8);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write((nameBytes.length >> 8) & 0xFF);
         baos.write(nameBytes.length & 0xFF);
         baos.write(nameBytes);
-        patchLevelDat("LevelName", (byte) 8, baos.toByteArray(), true);
+        patchLevelDat("LevelName", (byte) 8, baos.toByteArray());
         this.name = newName;
     }
 
@@ -205,34 +213,39 @@ public class WorldsData {
                 (byte) ((gamemodeId >> 8)  & 0xFF),
                 (byte)  (gamemodeId        & 0xFF)
         };
-        patchLevelDat("GameType", (byte) 3, value, false);
+        patchLevelDat("GameType", (byte) 3, value);
         this.gamemode = GAMEMODE_NAMES.getOrDefault(gamemodeId, String.valueOf(gamemodeId));
     }
 
     /**
-     * NBT field patcher
+     * NBT field patcher.
      *
-     * <p>Walks the {@code level.dat} NBT inside {@code saveData.ms}, locates
-     * the first tag matching {@code targetName} and {@code targetTagType},
-     * replaces its value bytes with {@code newValueBytes}, then recompresses
-     * and writes the save back to disk.
+     * Walks the level.dat NBT inside saveData.ms, locates the first tag
+     * matching targetName and targetTagType (searching recursively through
+     * nested TAG_Compound entries), replaces its value bytes with
+     * newValueBytes, then recompresses and writes the save back to disk.
      *
      * @param targetName     NBT tag name to find (e.g. "LevelName", "GameType")
-     * @param targetTagType  NBT type byte (8=TAG_String, 3=TAG_Int, …)
-     * @param newValueBytes  raw bytes to write as the new value (for TAG_String:
-     *                       uint16-BE length prefix + UTF-8 body; for TAG_Int:
-     *                       4 bytes big-endian)
-     * @param variableSize   {@code true} when the old and new value may differ in
-     *                       length (TAG_String); {@code false} for fixed-size tags
+     * @param targetTagType  NBT type byte (8=TAG_String, 3=TAG_Int, ...)
+     * @param newValueBytes  raw bytes to write as the new value:
+     *                         TAG_String: uint16-BE length prefix + UTF-8 body
+     *                         TAG_Int:    4 bytes big-endian
      */
     private void patchLevelDat(String targetName, byte targetTagType,
-                               byte[] newValueBytes, boolean variableSize) throws IOException {
+                               byte[] newValueBytes) throws IOException {
         Path   saveFile = folder.resolve("saveData.ms");
-        byte[] blob     = decompress(Files.readAllBytes(saveFile));
 
-        ByteBuffer buf          = ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN);
-        int        tableStart   = buf.getInt(0);
-        int        numFiles     = buf.getShort(4) & 0xFFFF;
+        File saveFileObj = saveFile.toFile();
+        if (!saveFileObj.canWrite()) {
+            if (!saveFileObj.setWritable(true))
+                throw new IOException("saveData.ms is read-only and could not be made writable: " + saveFile);
+        }
+
+        byte[] blob = decompress(Files.readAllBytes(saveFile));
+
+        ByteBuffer buf        = ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN);
+        int        tableStart = buf.getInt(0);
+        int        numFiles   = buf.getShort(4) & 0xFFFF;
 
         int ldEntryOff = -1;
         int ldStart    = -1;
@@ -254,11 +267,10 @@ public class WorldsData {
 
         byte[] oldNbt = Arrays.copyOfRange(blob, ldStart, ldStart + ldLen);
 
-        // find the value range of the target tag using CountingInputStream
         CountingInputStream cs  = new CountingInputStream(new ByteArrayInputStream(oldNbt));
         DataInputStream     dis = new DataInputStream(cs);
-        dis.readByte();          // root TAG_Compound
-        skipNbtString(dis);      // root name
+        dis.readByte();       // root TAG_Compound type
+        skipNbtString(dis);   // root compound name
 
         int[] valStart = {-1};
         int[] valEnd   = {-1};
@@ -270,19 +282,18 @@ public class WorldsData {
         // splice new value bytes into NBT
         int    oldValLen = valEnd[0] - valStart[0];
         byte[] newNbt    = new byte[oldNbt.length - oldValLen + newValueBytes.length];
-        System.arraycopy(oldNbt,       0,              newNbt, 0,                 valStart[0]);
-        System.arraycopy(newValueBytes, 0,             newNbt, valStart[0],        newValueBytes.length);
-        System.arraycopy(oldNbt,       valEnd[0],      newNbt, valStart[0] + newValueBytes.length,
+        System.arraycopy(oldNbt,        0,           newNbt, 0,                                valStart[0]);
+        System.arraycopy(newValueBytes, 0,           newNbt, valStart[0],                      newValueBytes.length);
+        System.arraycopy(oldNbt,        valEnd[0],   newNbt, valStart[0] + newValueBytes.length,
                 oldNbt.length - valEnd[0]);
 
         int sizeDelta = newNbt.length - oldNbt.length;
 
         // splice new NBT into blob
         byte[] newBlob = new byte[blob.length + sizeDelta];
-        System.arraycopy(blob,   0,              newBlob, 0,             ldStart);
-        System.arraycopy(newNbt, 0,              newBlob, ldStart,        newNbt.length);
-        System.arraycopy(blob,   ldStart + ldLen, newBlob, ldStart + newNbt.length,
-                blob.length - (ldStart + ldLen));
+        System.arraycopy(blob,   0,               newBlob, 0,                       ldStart);
+        System.arraycopy(newNbt, 0,               newBlob, ldStart,                 newNbt.length);
+        System.arraycopy(blob,   ldStart + ldLen, newBlob, ldStart + newNbt.length, blob.length - (ldStart + ldLen));
 
         // update level.dat length in file table if size changed
         if (sizeDelta != 0)
@@ -293,26 +304,35 @@ public class WorldsData {
     }
 
     /**
-     * Recursively walks a TAG_Compound, recording the byte range
-     * {@code [valStart, valEnd)} of the value payload for the first tag
-     * matching both {@code wantType} and {@code wantName}.
+     * Recursively walks TAG_Compound entries, recording the byte range
+     * [valStart, valEnd) of the value payload for the first tag matching
+     * both wantType and wantName.
+     *
+     * Recurses into nested TAG_Compound entries so that fields like GameType
+     * and LevelName which live inside a "Data" compound are found correctly.
      */
     private static void findTagValueRange(DataInputStream dis, CountingInputStream cs,
                                           byte wantType, String wantName,
                                           int[] valStart, int[] valEnd) throws IOException {
         while (true) {
-            byte   tag     = dis.readByte();
+            byte tag = dis.readByte();
             if (tag == 0) return;                        // TAG_End
             String tagName = readNbtString(dis);
 
             if (tag == wantType && wantName.equals(tagName)) {
                 valStart[0] = (int) cs.getCount();
-                skipTagValue(dis, tag);                  // consume the value to find end
+                skipTagValue(dis, tag);
                 valEnd[0] = (int) cs.getCount();
                 return;
             }
-            skipTagValue(dis, tag);                      // skip unrelated tag value
-            if (valStart[0] >= 0) return;                // already found (nested)
+
+            if (tag == 10) {
+                // recurse into nested TAG_Compound instead of skipping
+                findTagValueRange(dis, cs, wantType, wantName, valStart, valEnd);
+                if (valStart[0] >= 0) return;
+            } else {
+                skipTagValue(dis, tag);
+            }
         }
     }
 
@@ -331,7 +351,7 @@ public class WorldsData {
                 int  count   = dis.readInt();
                 for (int i = 0; i < count; i++) skipTagValue(dis, elemTag);
             }
-            case 10 -> {                                  // TAG_Compound — skip until TAG_End
+            case 10 -> {
                 while (true) {
                     byte inner = dis.readByte();
                     if (inner == 0) break;
@@ -369,29 +389,6 @@ public class WorldsData {
         public long getCount() { return count; }
     }
 
-    /**
-     * NBT parser (confirmed: standard uncompressed NBT, UTF-8 strings).
-     *
-     * <p><b>Tag types used in {@code level.dat}:</b>
-     * <pre>
-     * ID   Tag Name        Payload
-     * ---  --------------  --------------------------
-     *  0   TAG_End         (none - terminates TAG_Compound)
-     *  1   TAG_Byte        1 byte
-     *  2   TAG_Short       2 bytes, big-endian
-     *  3   TAG_Int         4 bytes, big-endian
-     *  4   TAG_Long        8 bytes, big-endian
-     *  5   TAG_Float       4 bytes, big-endian
-     *  6   TAG_Double      8 bytes, big-endian
-     *  7   TAG_Byte_Array  int32 length + n bytes
-     *  8   TAG_String      uint16 length + UTF-8 bytes
-     *  9   TAG_List        byte elemType + int32 count + n payloads
-     * 10   TAG_Compound    repeated (tag + name + payload) until TAG_End
-     * 11   TAG_Int_Array   int32 length + n * 4 bytes
-     * </pre>
-     *
-     * @see <a href="https://wiki.vg/NBT">NBT format specification</a>
-     */
     private void parseLevelDat(byte[] nbt) throws IOException {
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(nbt));
         byte rootTag = dis.readByte();
@@ -453,8 +450,6 @@ public class WorldsData {
     private static void skipNbtString(DataInputStream dis) throws IOException {
         dis.skipBytes(dis.readUnsignedShort());
     }
-
-    // --- Metadata ---
 
     private void populateFileInfo(Path folder) {
         try {
@@ -536,7 +531,6 @@ public class WorldsData {
     public String getSize()             { return size; }
     public String getCreated()          { return created; }
     public Path   getFolder()           { return folder; }
-
 
     public int getGamemodeId() {
         for (Map.Entry<Integer, String> e : GAMEMODE_NAMES.entrySet())

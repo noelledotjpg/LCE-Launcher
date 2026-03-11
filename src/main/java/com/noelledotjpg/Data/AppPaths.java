@@ -7,10 +7,12 @@ public final class AppPaths {
 
     private AppPaths() {}
 
-    private static final String BASE = "src/main/resources/data";
+    private static final Path BASE = Paths.get(
+            System.getenv("LOCALAPPDATA"), "LCELauncher", "data"
+    );
 
-    public static final Path VARS_JSON        = Paths.get(BASE, "launcher/vars.json");
-    public static final Path PREFERENCES_JSON = Paths.get(BASE, "launcher/preferences.json");
-    public static final Path PROFILES_JSON    = Paths.get(BASE, "usernames.json");
-    public static final Path PLAYTIME_JSON    = Paths.get(BASE, "playtime.json");
+    public static final Path VARS_JSON        = BASE.resolve("launcher/vars.json");
+    public static final Path PREFERENCES_JSON = BASE.resolve("launcher/preferences.json");
+    public static final Path PROFILES_JSON    = BASE.resolve("usernames.json");
+    public static final Path PLAYTIME_JSON    = BASE.resolve("playtime.json");
 }

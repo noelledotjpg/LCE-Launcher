@@ -15,7 +15,4 @@ public class SetupPaths {
     public static File releaseExe(File repoRoot)  { return new File(releaseDir(repoRoot), "MinecraftClient.exe"); }
     public static File usernameTxt(File repoRoot) { return new File(repoRoot, "username.txt"); }
     public static File serversTxt(File repoRoot)  { return new File(repoRoot, "servers.txt"); }
-
-    public static final String VARS_JSON      = "src/main/resources/data/launcher/vars.json";
-    public static final String USERNAMES_JSON = "src/main/resources/data/usernames.json";
 }

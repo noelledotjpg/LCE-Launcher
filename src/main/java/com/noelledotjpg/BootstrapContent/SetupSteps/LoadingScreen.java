@@ -3,7 +3,7 @@ package com.noelledotjpg.BootstrapContent.SetupSteps;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.noelledotjpg.BootstrapContent.LCESetup;
-import com.noelledotjpg.BootstrapContent.SetupPaths;
+import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.VarsData;
 
 import javax.swing.*;
@@ -76,7 +76,7 @@ public class LoadingScreen extends JPanel {
 
     public boolean isBuildAlreadyDone() {
         try {
-            File f = new File(SetupPaths.VARS_JSON);
+            File f = AppPaths.VARS_JSON.toFile();
             if (!f.exists()) return false;
             return new Gson().fromJson(Files.readString(f.toPath()), VarsData.class).isSetupDone();
         } catch (Exception e) {
@@ -182,7 +182,7 @@ public class LoadingScreen extends JPanel {
 
     private void markBuildComplete() {
         try {
-            File f = new File(SetupPaths.VARS_JSON);
+            File f = AppPaths.VARS_JSON.toFile();
             f.getParentFile().mkdirs();
             Gson gson = new GsonBuilder().setPrettyPrinting().create();
             VarsData data = f.exists()

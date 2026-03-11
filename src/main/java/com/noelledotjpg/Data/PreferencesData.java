@@ -4,8 +4,10 @@ public class PreferencesData {
 
     private boolean fullscreen;
     private String  launcherVisibility  = "Hide when game starts";
-    private boolean checkForUpdates     = false;
-    private String  updateFrequency     = "When launcher opens";
+    private boolean checkForUpdates          = false;
+    private String  updateFrequency          = "When launcher opens";
+    private boolean checkForLauncherUpdates  = true;
+    private String  launcherUpdateFrequency  = "Every 24 hours";
     private String  newsPageMode        = "Default";
     private String  newsPageCustomUrl   = "";
 
@@ -20,6 +22,12 @@ public class PreferencesData {
 
     public String  getUpdateFrequency()                 { return updateFrequency; }
     public void    setUpdateFrequency(String value)     { this.updateFrequency = value; }
+
+    public boolean isCheckForLauncherUpdates()                   { return checkForLauncherUpdates; }
+    public void    setCheckForLauncherUpdates(boolean value)     { this.checkForLauncherUpdates = value; }
+
+    public String  getLauncherUpdateFrequency()                  { return launcherUpdateFrequency; }
+    public void    setLauncherUpdateFrequency(String value)      { this.launcherUpdateFrequency = value; }
 
     public String  getNewsPageMode()                    { return newsPageMode; }
     public void    setNewsPageMode(String value)        { this.newsPageMode = value; }

@@ -5,7 +5,10 @@ import com.google.gson.GsonBuilder;
 import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.PreferencesData;
 import com.noelledotjpg.Data.VarsData;
+import com.noelledotjpg.Data.LauncherUpdateChecker;
+import com.noelledotjpg.Data.LauncherUpdateChecker.LauncherReleaseInfo;
 import com.noelledotjpg.MainContent.LaunchArguments;
+import com.noelledotjpg.MainContent.LauncherUpdateDialog;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
@@ -109,6 +112,20 @@ public class PreferencesTab extends JPanel {
                 prefs.getUpdateFrequency(),
                 checked  -> { prefs.setCheckForUpdates(checked); save(); },
                 selected -> { prefs.setUpdateFrequency(selected); save(); }
+        ));
+        s.addRow(checkboxComboRow(
+                "Check for launcher updates",
+                prefs.isCheckForLauncherUpdates(),
+                new String[]{"When launcher opens", "Every 24 hours", "Every week"},
+                prefs.getLauncherUpdateFrequency(),
+                checked  -> { prefs.setCheckForLauncherUpdates(checked); save(); },
+                selected -> { prefs.setLauncherUpdateFrequency(selected); save(); }
+        ));
+        s.addRow(buttonRow(
+                "Launcher update",
+                "Check for a new launcher version",
+                "Check Now",
+                e -> checkForLauncherUpdate()
         ));
         s.addRow(buttonRow(
                 "Redownload LCE",
@@ -287,6 +304,41 @@ public class PreferencesTab extends JPanel {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void checkForLauncherUpdate() {
+        // Disable button while checking to avoid double-clicks
+        // We find it via the parent row, so just run on a background thread and re-enable after
+        new Thread(() -> {
+            try {
+                LauncherReleaseInfo release = LauncherUpdateChecker.fetchIfNewer();
+
+                SwingUtilities.invokeLater(() -> {
+                    if (release == null) {
+                        JOptionPane.showMessageDialog(this,
+                                "You are already on the latest version (" + VarsData.VERSION + ").",
+                                "No Update Available", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+
+                    int choice = JOptionPane.showConfirmDialog(this,
+                            "A new launcher version is available: " + release.tagName() + "\n" +
+                                    "Your version: v" + VarsData.VERSION + "\n\n" +
+                                    "Download and install now?",
+                            "Launcher Update Available", JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE);
+
+                    if (choice == JOptionPane.YES_OPTION)
+                        LauncherUpdateDialog.show(this, release);
+                });
+
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() ->
+                        JOptionPane.showMessageDialog(this,
+                                "Could not check for updates:\n" + ex.getMessage(),
+                                "Update Check Failed", JOptionPane.ERROR_MESSAGE));
+            }
+        }, "launcher-update-check").start();
     }
 
     private void redownloadRepo() {

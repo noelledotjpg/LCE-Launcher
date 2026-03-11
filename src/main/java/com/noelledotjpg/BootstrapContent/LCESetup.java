@@ -1,6 +1,7 @@
 package com.noelledotjpg.BootstrapContent;
 
 import com.google.gson.GsonBuilder;
+import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.VarsData;
 
 import java.io.*;
@@ -183,7 +184,7 @@ public class LCESetup {
     }
 
     private boolean isBuildSystemFile(String name) {
-        return name.equals("CMakeFiles") || name.equals("Debug")
+        return name.equals("CMakeFiles") || name.equals("Debug") || name.equals("Common")
                 || name.endsWith(".sln")             || name.endsWith(".vcxproj")
                 || name.endsWith(".vcxproj.filters") || name.endsWith(".vcxproj.user")
                 || name.endsWith(".tlog")            || name.endsWith(".obj")
@@ -208,7 +209,7 @@ public class LCESetup {
     }
 
     private void writeUsernameJson() throws IOException {
-        File f = new File(SetupPaths.USERNAMES_JSON);
+        File f = AppPaths.PROFILES_JSON.toFile();
         f.getParentFile().mkdirs();
         String json = "{\n  \"lastUsed\": \"" + username + "\",\n  \"usernames\": [\"" + username + "\"]\n}";
         try (FileWriter w = new FileWriter(f)) { w.write(json); }
@@ -216,7 +217,7 @@ public class LCESetup {
     }
 
     private void writeVarsJson() throws IOException {
-        File f = new File(SetupPaths.VARS_JSON);
+        File f = AppPaths.VARS_JSON.toFile();
         f.getParentFile().mkdirs();
         VarsData vars = new VarsData();
         vars.setSetupDone(false);

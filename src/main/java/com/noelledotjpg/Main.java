@@ -63,6 +63,8 @@ public class Main extends JFrame {
         UpdateNotesTab updateNotesTab = new UpdateNotesTab(preferencesData);
         if (preferencesData.isCheckForUpdates())
             UpdateWindow.checkAndPrompt(this, varsData.getInstalledCommitHash());
+        if (preferencesData.isCheckForLauncherUpdates())
+            checkForLauncherUpdateOnOpen();
 
         tabbedPane.addTab("Update Notes",   updateNotesTab);
         tabbedPane.addTab("Launcher Log",   launcherLogTab);
@@ -151,6 +153,29 @@ public class Main extends JFrame {
             e.printStackTrace();
         }
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
+    }
+
+    private void checkForLauncherUpdateOnOpen() {
+        new Thread(() -> {
+            try {
+                com.noelledotjpg.Data.LauncherUpdateChecker.LauncherReleaseInfo release =
+                        com.noelledotjpg.Data.LauncherUpdateChecker.fetchIfNewer();
+                if (release == null) return;
+
+                SwingUtilities.invokeLater(() -> {
+                    int choice = JOptionPane.showConfirmDialog(this,
+                            "A new launcher version is available: " + release.tagName() + "\n" +
+                                    "Your version: v" + com.noelledotjpg.Data.VarsData.VERSION + "\n\n" +
+                                    "Download and install now?",
+                            "Launcher Update Available", JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE);
+                    if (choice == JOptionPane.YES_OPTION)
+                        LauncherUpdateDialog.show(this, release);
+                });
+            } catch (Exception e) {
+                System.err.println("Launcher update check failed: " + e.getMessage());
+            }
+        }, "launcher-update-check").start();
     }
 
     private VarsData loadVars() {
