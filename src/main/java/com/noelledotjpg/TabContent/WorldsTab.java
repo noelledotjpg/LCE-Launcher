@@ -30,7 +30,7 @@ public class WorldsTab extends JPanel {
 
         if (varsData != null && varsData.getLceFolder() != null)
             worldsDir = Paths.get(varsData.getLceFolder(),
-                    "build", "Release", "Windows64", "GameHDD");
+                    "build", "Windows64", "GameHDD");
 
         model = new DefaultTableModel(
                 new Object[]{"", "World Name", "Game Mode", "Seed", "Size", "Created"}, 0) {
@@ -149,7 +149,7 @@ public class WorldsTab extends JPanel {
         return worlds;
     }
 
-    private static final String[] GAMEMODE_LABELS = {"Survival", "Creative", "Adventure", "Spectator"};
+    private static final String[] GAMEMODE_LABELS = {"Survival", "Creative"};
 
     private void openWorldEditor(int row) {
         if (row < 0 || row >= loadedWorlds.size()) return;

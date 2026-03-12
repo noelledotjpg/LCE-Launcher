@@ -43,7 +43,7 @@ public class ServersTab extends JPanel {
         setLayout(new BorderLayout());
 
         dbPath = (varsData != null && varsData.getLceFolder() != null)
-                ? Paths.get(varsData.getLceFolder(), "build", "Release", "servers.db")
+                ? Paths.get(varsData.getLceFolder(), "build", "servers.db")
                 : Paths.get("servers.db");
 
         model = new DefaultTableModel(new Object[]{"", "Name", "IP", "Port"}, 0) {
