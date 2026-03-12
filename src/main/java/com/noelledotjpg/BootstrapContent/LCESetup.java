@@ -184,7 +184,7 @@ public class LCESetup {
     }
 
     private boolean isBuildSystemFile(String name) {
-        return name.equals("CMakeFiles") || name.equals("Debug") || name.equals("Common")
+        return name.equals("CMakeFiles") || name.equals("Debug")
                 || name.endsWith(".sln")             || name.endsWith(".vcxproj")
                 || name.endsWith(".vcxproj.filters") || name.endsWith(".vcxproj.user")
                 || name.endsWith(".tlog")            || name.endsWith(".obj")

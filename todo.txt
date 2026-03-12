@@ -1,5 +1,6 @@
 TODO:
-[ ]
+[ ] Improve setup phase for new users
+[ ] fix LaF in windows 11
 
 TODO (Low Priority):
 [ ] Themes/LaF
