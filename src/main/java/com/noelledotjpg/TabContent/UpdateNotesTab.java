@@ -19,6 +19,18 @@ public class UpdateNotesTab extends JPanel {
         setLayout(new BorderLayout());
 
         JFXPanel fxPanel = new JFXPanel();
+
+        // FlatLaf interferes with the Swing/JavaFX bridge — explicitly setting the
+        // background and forcing a repaint when the panel is first shown fixes the
+        // blank panel issue when a FlatLaf theme is active.
+        fxPanel.setBackground(Color.BLACK);
+        fxPanel.addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0
+                    && fxPanel.isShowing()) {
+                fxPanel.repaint();
+            }
+        });
+
         add(fxPanel, BorderLayout.CENTER);
 
         Platform.runLater(() -> {
@@ -78,7 +90,11 @@ public class UpdateNotesTab extends JPanel {
                 }
             });
 
-            fxPanel.setScene(new Scene(scrollPane));
+            Scene scene = new Scene(scrollPane);
+            fxPanel.setScene(scene);
+
+            // Nudge the panel to paint once the scene is attached
+            SwingUtilities.invokeLater(fxPanel::repaint);
         });
     }
 

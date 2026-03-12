@@ -31,8 +31,7 @@ public class Bootstrap extends JFrame {
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
-        catch (Exception ignored) {}
+        com.noelledotjpg.MainContent.ThemeManager.applyFromDisk();
 
         UIManager.put("ButtonUI", BrowsePlainButtonUI.class.getName());
 

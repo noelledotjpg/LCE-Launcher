@@ -144,14 +144,17 @@ public class Main extends JFrame {
         updateProfilesCombo(profilesData.getUsernames());
         if (profilesData.getLastUsed() != null && !profilesData.getLastUsed().isEmpty())
             profilesCombo.setSelectedItem(profilesData.getLastUsed());
+
+        // Reload varsData from disk whenever the launcher regains focus,
+        // so that paths updated by reinstall/update are picked up without a restart.
+        addWindowFocusListener(new java.awt.event.WindowFocusListener() {
+            public void windowGainedFocus(java.awt.event.WindowEvent e) { reloadVarsData(); }
+            public void windowLostFocus(java.awt.event.WindowEvent e)   {}
+        });
     }
 
     public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        ThemeManager.applyFromDisk();
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
 
@@ -176,6 +179,15 @@ public class Main extends JFrame {
                 System.err.println("Launcher update check failed: " + e.getMessage());
             }
         }, "launcher-update-check").start();
+    }
+
+    private void reloadVarsData() {
+        VarsData fresh = loadVars();
+        varsData.setSetupDone(fresh.isSetupDone());
+        varsData.setLceFolder(fresh.getLceFolder());
+        varsData.setMinecraftExe(fresh.getMinecraftExe());
+        varsData.setInstalledCommitHash(fresh.getInstalledCommitHash());
+        varsData.setSkippedCommitHash(fresh.getSkippedCommitHash());
     }
 
     private VarsData loadVars() {

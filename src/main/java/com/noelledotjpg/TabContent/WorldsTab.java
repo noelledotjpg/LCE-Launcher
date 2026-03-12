@@ -55,8 +55,6 @@ public class WorldsTab extends JPanel {
         t.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         t.setFillsViewportHeight(true);
         t.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        t.setBackground(Color.WHITE);
-        t.setGridColor(Color.LIGHT_GRAY);
         t.setShowGrid(true);
         t.setShowHorizontalLines(true);
         t.setShowVerticalLines(false);
@@ -79,7 +77,7 @@ public class WorldsTab extends JPanel {
             JLabel label = new JLabel();
             label.setHorizontalAlignment(SwingConstants.CENTER);
             label.setOpaque(true);
-            label.setBackground(selected ? tbl.getSelectionBackground() : new Color(30, 30, 30));
+            label.setBackground(selected ? tbl.getSelectionBackground() : tbl.getBackground());
             if (value instanceof ImageIcon icon) label.setIcon(icon);
             return label;
         });

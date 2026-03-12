@@ -5,9 +5,12 @@ import com.noelledotjpg.Data.AppPaths;
 import com.noelledotjpg.Data.PlaytimeTracker;
 import com.noelledotjpg.Data.ProfilesData;
 
+import com.noelledotjpg.BootstrapContent.SetupSteps.SetupStepUsername;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.AbstractDocument;
 import java.awt.*;
 import java.io.IOException;
 import java.io.Writer;
@@ -46,8 +49,6 @@ public class ProfileEditorTab extends JPanel {
         profileTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         profileTable.setFillsViewportHeight(true);
         profileTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        profileTable.setBackground(Color.WHITE);
-        profileTable.setGridColor(Color.LIGHT_GRAY);
         profileTable.setShowGrid(true);
         profileTable.setShowHorizontalLines(true);
         profileTable.setShowVerticalLines(false);
@@ -144,7 +145,12 @@ public class ProfileEditorTab extends JPanel {
     }
 
     public String showAddProfileDialog(Component parent) {
-        String name = JOptionPane.showInputDialog(parent, "New profile name:");
+        JTextField field = new JTextField();
+        ((AbstractDocument) field.getDocument()).setDocumentFilter(new SetupStepUsername.UsernameFilter());
+        int result = JOptionPane.showConfirmDialog(parent,
+                new Object[]{"New profile name (a-z, 0-9, _ — max 16 chars):", field},
+                "Add Profile", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        String name = (result == JOptionPane.OK_OPTION) ? field.getText().trim() : null;
         if (name != null && !name.isBlank()) {
             addProfile(name);
             return name;
@@ -207,10 +213,23 @@ public class ProfileEditorTab extends JPanel {
 
         gbc.gridx = 1; gbc.weightx = 1;
         JTextField usernameField = new JTextField(username);
+        ((AbstractDocument) usernameField.getDocument()).setDocumentFilter(new SetupStepUsername.UsernameFilter());
         profileInfo.add(usernameField, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2; gbc.weightx = 0;
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 0;
         profileInfo.add(new JLabel("Time Played: " + timePlayed), gbc);
+
+        gbc.gridx = 1; gbc.weightx = 1;
+        JLabel charCount = new JLabel(username.length() + "/16");
+        charCount.setForeground(Color.GRAY);
+        charCount.setFont(charCount.getFont().deriveFont(11f));
+        profileInfo.add(charCount, gbc);
+        usernameField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            void update() { charCount.setText(usernameField.getText().length() + "/16"); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e)  { update(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e)  { update(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+        });
 
         mainPanel.add(profileInfo);
 

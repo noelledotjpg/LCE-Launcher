@@ -1,9 +1,10 @@
 TODO:
 [ ] Improve setup phase for new users
-[ ] fix LaF in windows 11
+[~] fix LaF in windows 11
 
 TODO (Low Priority):
-[ ] Themes/LaF
+[ ] add custom skin and dlc creation
+[x] Themes/LaF
 [ ] Translations
 [ ] Add a way to clear play time from profiles
 [ ]

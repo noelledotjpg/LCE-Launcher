@@ -3,13 +3,16 @@ package com.noelledotjpg.Data;
 public class PreferencesData {
 
     private boolean fullscreen;
-    private String  launcherVisibility  = "Hide when game starts";
-    private boolean checkForUpdates          = false;
-    private String  updateFrequency          = "When launcher opens";
-    private boolean checkForLauncherUpdates  = true;
-    private String  launcherUpdateFrequency  = "Every 24 hours";
-    private String  newsPageMode        = "Default";
-    private String  newsPageCustomUrl   = "";
+    private String  launcherVisibility      = "Hide when game starts";
+    private boolean checkForUpdates         = false;
+    private String  updateFrequency         = "When launcher opens";
+    private boolean checkForLauncherUpdates = true;
+    private String  launcherUpdateFrequency = "Every 24 hours";
+    private String  newsPageMode            = "Default";
+    private String  newsPageCustomUrl       = "";
+    private boolean debugMode               = false;
+    private String  theme                   = "System";
+    private boolean useSystemTitleBar       = true;
 
     public boolean isFullscreen()                       { return fullscreen; }
     public void    setFullscreen(boolean fullscreen)    { this.fullscreen = fullscreen; }
@@ -34,6 +37,15 @@ public class PreferencesData {
 
     public String  getNewsPageCustomUrl()               { return newsPageCustomUrl; }
     public void    setNewsPageCustomUrl(String value)   { this.newsPageCustomUrl = value; }
+
+    public boolean isDebugMode()                        { return debugMode; }
+    public void    setDebugMode(boolean value)          { this.debugMode = value; }
+
+    public String  getTheme()                           { return theme != null ? theme : "System"; }
+    public void    setTheme(String value)               { this.theme = value; }
+
+    public boolean isUseSystemTitleBar()                { return useSystemTitleBar; }
+    public void    setUseSystemTitleBar(boolean value)  { this.useSystemTitleBar = value; }
 
     public String  getResolvedNewsUrl() {
         if ("Custom".equals(newsPageMode) && newsPageCustomUrl != null && !newsPageCustomUrl.isBlank())

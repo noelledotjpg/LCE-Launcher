@@ -55,8 +55,8 @@ public class LCESetup {
         } else {
             runCMake();
             buildRelease();
-            moveArtifacts();
-            writeServersDb();   // after moveArtifacts so release dir exists
+            BuildArtifactManager.moveReleaseToBuild(repoRoot, logger);
+            writeServersDb();
             progress.accept(90);
         }
 
@@ -127,35 +127,8 @@ public class LCESetup {
         });
     }
 
-    private void moveArtifacts() throws IOException {
-        File buildDir   = SetupPaths.buildDir(repoRoot);
-        File releaseDir = SetupPaths.releaseDir(repoRoot);
-
-        if (!releaseDir.exists()) throw new IOException("Release folder missing after build.");
-
-        File[] items = buildDir.listFiles();
-        if (items != null) {
-            for (File item : items) {
-                if (item.equals(releaseDir) || isBuildSystemFile(item.getName())) continue;
-                Files.move(item.toPath(), releaseDir.toPath().resolve(item.getName()),
-                        StandardCopyOption.REPLACE_EXISTING);
-                logger.accept("Moved: " + item.getName());
-            }
-        }
-
-        copyToRelease(SetupPaths.usernameTxt(repoRoot), releaseDir);
-    }
-
-    private void copyToRelease(File file, File releaseDir) throws IOException {
-        if (file.exists()) {
-            Files.copy(file.toPath(), releaseDir.toPath().resolve(file.getName()),
-                    StandardCopyOption.REPLACE_EXISTING);
-            logger.accept("Copied: " + file.getName());
-        }
-    }
-
     private void writeServersDb() throws IOException {
-        File releaseDir = SetupPaths.releaseDir(repoRoot);
+        File releaseDir = SetupPaths.buildDir(repoRoot);
         File dbFile     = new File(releaseDir, "servers.db");
 
         if (dbFile.exists()) {
@@ -169,8 +142,8 @@ public class LCESetup {
 
         try (DataOutputStream out = new DataOutputStream(new FileOutputStream(dbFile))) {
             out.writeBytes("MCSV");
-            writeIntLE(out, 1);          // version
-            writeIntLE(out, 1);          // entry count
+            writeIntLE(out, 1);
+            writeIntLE(out, 1);
 
             byte[] ipBytes   = ip.getBytes();
             byte[] nameBytes = name.getBytes();
@@ -183,16 +156,8 @@ public class LCESetup {
         logger.accept("Created servers.db");
     }
 
-    private boolean isBuildSystemFile(String name) {
-        return name.equals("CMakeFiles") || name.equals("Debug")
-                || name.endsWith(".sln")             || name.endsWith(".vcxproj")
-                || name.endsWith(".vcxproj.filters") || name.endsWith(".vcxproj.user")
-                || name.endsWith(".tlog")            || name.endsWith(".obj")
-                || name.endsWith(".lastbuildstate")  || name.endsWith(".dir");
-    }
-
     private void createShortcut() throws IOException, InterruptedException {
-        File exe      = SetupPaths.releaseExe(repoRoot);
+        File exe      = BuildArtifactManager.activeExe(repoRoot);
         File shortcut = new File(repoRoot, "Minecraft LCE.lnk");
         if (!testMode && !exe.exists()) throw new IOException("MinecraftClient.exe not found after build.");
         if (exe.exists()) {
@@ -222,7 +187,7 @@ public class LCESetup {
         VarsData vars = new VarsData();
         vars.setSetupDone(false);
         vars.setLceFolder(repoRoot.getAbsolutePath());
-        vars.setMinecraftExe(SetupPaths.releaseExe(repoRoot).getAbsolutePath());
+        vars.setMinecraftExe(BuildArtifactManager.activeExe(repoRoot).getAbsolutePath());
         vars.setInstalledCommitHash(getRepoHeadHash());
         try (FileWriter w = new FileWriter(f)) {
             new GsonBuilder().setPrettyPrinting().create().toJson(vars, w);
@@ -230,7 +195,6 @@ public class LCESetup {
         logger.accept("Saved vars.json");
     }
 
-    /** Runs `git rev-parse HEAD` in the repo directory and returns the full commit hash. */
     private String getRepoHeadHash() {
         try {
             Process p = new ProcessBuilder("git", "rev-parse", "HEAD")
@@ -244,8 +208,6 @@ public class LCESetup {
             return "";
         }
     }
-
-    // --- Little-endian write helpers ---
 
     private static void writeShortLE(DataOutputStream out, int value) throws IOException {
         out.writeByte(value & 0xFF);

@@ -61,8 +61,6 @@ public class ServersTab extends JPanel {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setFillsViewportHeight(true);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-        table.setBackground(Color.WHITE);
-        table.setGridColor(Color.LIGHT_GRAY);
         table.setShowGrid(true);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
@@ -79,7 +77,7 @@ public class ServersTab extends JPanel {
             JLabel label = new JLabel();
             label.setHorizontalAlignment(SwingConstants.CENTER);
             label.setOpaque(true);
-            label.setBackground(selected ? tbl.getSelectionBackground() : new Color(30, 30, 30));
+            label.setBackground(selected ? tbl.getSelectionBackground() : tbl.getBackground());
             if (value instanceof ImageIcon icon) label.setIcon(icon);
             return label;
         });

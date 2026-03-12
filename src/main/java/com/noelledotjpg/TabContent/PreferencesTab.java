@@ -9,13 +9,13 @@ import com.noelledotjpg.Data.LauncherUpdateChecker;
 import com.noelledotjpg.Data.LauncherUpdateChecker.LauncherReleaseInfo;
 import com.noelledotjpg.MainContent.LaunchArguments;
 import com.noelledotjpg.MainContent.LauncherUpdateDialog;
+import com.noelledotjpg.MainContent.ThemeManager;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.util.function.Consumer;
@@ -34,6 +34,8 @@ public class PreferencesTab extends JPanel {
     private final JComboBox<String> profileCombo;
     private final LaunchArguments   launchArgs;
     private final UpdateNotesTab    updateNotesTab;
+
+    private final JScrollPane   scroll;
 
     public PreferencesTab(PreferencesData prefs, JComboBox<String> profileCombo,
                           LaunchArguments launchArgs, String exePath,
@@ -54,9 +56,21 @@ public class PreferencesTab extends JPanel {
         content.add(Box.createVerticalStrut(SECTION_GAP));
         content.add(buildAppearanceSection());
         content.add(Box.createVerticalStrut(SECTION_GAP));
+        content.add(buildLCESection());
+        content.add(Box.createVerticalStrut(SECTION_GAP));
         content.add(buildOtherSection());
+        content.add(Box.createVerticalStrut(SECTION_GAP));
 
-        add(content, BorderLayout.NORTH);
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setOpaque(false);
+        wrapper.add(content, BorderLayout.NORTH);
+
+        scroll = new JScrollPane(wrapper,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(12);
+        add(scroll, BorderLayout.CENTER);
     }
 
     private JPanel buildLauncherSection() {
@@ -66,6 +80,7 @@ public class PreferencesTab extends JPanel {
                 prefs.isFullscreen(),
                 selected -> { prefs.setFullscreen(selected); save(); }
         ));
+
         s.addRow(comboRow(
                 "Launcher visibility",
                 new String[]{"Close when game starts", "Hide when game starts", "Keep launcher open"},
@@ -77,6 +92,40 @@ public class PreferencesTab extends JPanel {
 
     private JPanel buildAppearanceSection() {
         SectionBuilder s = new SectionBuilder("Appearance");
+
+        JPanel titleBarRow = checkboxRow(
+                "Use system title bar",
+                !prefs.isUseSystemTitleBar(),
+                selected -> {
+                    prefs.setUseSystemTitleBar(!selected);
+                    save();
+                    int choice = JOptionPane.showConfirmDialog(
+                            this,
+                            "Changing the title bar requires a restart to take effect.\nRestart now?",
+                            "Restart Required",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.INFORMATION_MESSAGE);
+                    if (choice == JOptionPane.YES_OPTION) restartLauncher();
+                }
+        );
+        boolean isFlatTheme = isFlatLafTheme(prefs.getTheme());
+        titleBarRow.setEnabled(isFlatTheme);
+        for (Component c : titleBarRow.getComponents()) c.setEnabled(isFlatTheme);
+
+        s.addRow(comboRow(
+                "Theme",
+                ThemeManager.ALL_THEMES,
+                prefs.getTheme(),
+                selected -> {
+                    prefs.setTheme(selected);
+                    save();
+                    applyTheme(selected);
+                    boolean flat = isFlatLafTheme(selected);
+                    titleBarRow.setEnabled(flat);
+                    for (Component c : titleBarRow.getComponents()) c.setEnabled(flat);
+                }
+        ));
+        s.addRow(titleBarRow);
         s.addRow(comboFieldRow(
                 "Update News page",
                 new String[]{"Default", "Custom"},
@@ -92,6 +141,35 @@ public class PreferencesTab extends JPanel {
                     save();
                     updateNotesTab.reload(prefs.getResolvedNewsUrl());
                 }
+        ));
+        return s.build();
+    }
+
+    private JPanel buildLCESection() {
+        SectionBuilder s = new SectionBuilder("LCE Preferences");
+
+        JPanel debugRow = checkboxRow(
+                "Launch game in debug mode",
+                prefs.isDebugMode(),
+                selected -> {
+                    prefs.setDebugMode(selected);
+                    save();
+                    swapDebugMode(selected);
+                }
+        );
+        debugRow.setEnabled(false);
+        for (Component c : debugRow.getComponents()) {
+            c.setEnabled(false);
+            if (c instanceof JComponent jc)
+                jc.setToolTipText("Debug mode is temporarily unavailable (nightly builds broke it, lol)");
+        }
+        s.addRow(debugRow);
+
+        s.addRow(buttonRow(
+                "Reinstall LCE",
+                "Delete build folder and reinstall",
+                "Reinstall",
+                e -> redownloadRepo()
         ));
         return s.build();
     }
@@ -125,12 +203,6 @@ public class PreferencesTab extends JPanel {
                 "Check for a new launcher version",
                 "Check Now",
                 e -> checkForLauncherUpdate()
-        ));
-        s.addRow(buttonRow(
-                "Reinstall LCE",
-                "Delete build folder and reinstall",
-                "Reinstall",
-                e -> redownloadRepo()
         ));
         return s.build();
     }
@@ -294,6 +366,24 @@ public class PreferencesTab extends JPanel {
         return label;
     }
 
+    private void applyTheme(String themeName) {
+        ThemeManager.apply(prefs);
+        SwingUtilities.updateComponentTreeUI(SwingUtilities.getWindowAncestor(this));
+        scroll.setBorder(null);
+    }
+
+    private static boolean isFlatLafTheme(String themeName) {
+        return ThemeManager.isFlatLaf(themeName);
+    }
+
+    private void restartLauncher() {
+        SwingUtilities.getWindowAncestor(this).dispose();
+        SwingUtilities.invokeLater(() -> {
+            ThemeManager.apply(prefs);
+            new com.noelledotjpg.Main().setVisible(true);
+        });
+    }
+
     private void save() {
         try {
             Files.createDirectories(AppPaths.PREFERENCES_JSON.getParent());
@@ -336,6 +426,16 @@ public class PreferencesTab extends JPanel {
                                 "Update Check Failed", JOptionPane.ERROR_MESSAGE));
             }
         }, "launcher-update-check").start();
+    }
+
+    private void swapDebugMode(boolean toDebug) {
+        com.noelledotjpg.MainContent.UpdateWindow.showDebugSwitch(
+                this, toDebug,
+                () -> {},                          // onSuccess — checkbox already set
+                () -> {                            // onFailure — revert checkbox
+                    prefs.setDebugMode(!toDebug);
+                    save();
+                });
     }
 
     private void redownloadRepo() {

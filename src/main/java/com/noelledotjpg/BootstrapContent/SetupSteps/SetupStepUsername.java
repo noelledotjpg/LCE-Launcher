@@ -2,6 +2,10 @@ package com.noelledotjpg.BootstrapContent.SetupSteps;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -29,7 +33,15 @@ public class SetupStepUsername extends JPanel {
         usernameField = new JTextField();
         usernameField.setBounds(10, 20, SetupLayout.INNER_WIDTH - 20, 20);
         usernameField.setToolTipText("e.g. Steve");
+        ((AbstractDocument) usernameField.getDocument()).setDocumentFilter(new UsernameFilter());
         container.add(usernameField);
+
+        JLabel charCount = new JLabel("0/16");
+        charCount.setForeground(Color.DARK_GRAY);
+        charCount.setFont(charCount.getFont().deriveFont(11f));
+        charCount.setBounds(SetupLayout.INNER_WIDTH - 50, 43, 40, 15);
+        charCount.setHorizontalAlignment(SwingConstants.RIGHT);
+        container.add(charCount);
 
         JLabel info = new JLabel("(This will be saved as your profile)");
         info.setForeground(Color.DARK_GRAY);
@@ -50,7 +62,9 @@ public class SetupStepUsername extends JPanel {
 
         usernameField.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) {
-                continueButton.setEnabled(!usernameField.getText().trim().isEmpty());
+                int len = usernameField.getText().trim().length();
+                charCount.setText(len + "/16");
+                continueButton.setEnabled(len > 0);
             }
         });
     }
@@ -58,4 +72,27 @@ public class SetupStepUsername extends JPanel {
     public String getUsername()        { return usernameField.getText().trim(); }
     public JButton getContinueButton() { return continueButton; }
     public JButton getCancelButton()   { return cancelButton; }
+
+    /** Restricts input to alphanumeric + underscore, max 16 characters. */
+    public static class UsernameFilter extends DocumentFilter {
+        @Override
+        public void insertString(FilterBypass fb, int offset, String text, AttributeSet attr)
+                throws BadLocationException {
+            if (text == null) return;
+            String filtered = text.replaceAll("[^a-zA-Z0-9_]", "");
+            int newLen = fb.getDocument().getLength() + filtered.length();
+            if (newLen > 16) filtered = filtered.substring(0, 16 - fb.getDocument().getLength());
+            super.insertString(fb, offset, filtered, attr);
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attr)
+                throws BadLocationException {
+            if (text == null) return;
+            String filtered = text.replaceAll("[^a-zA-Z0-9_]", "");
+            int newLen = fb.getDocument().getLength() - length + filtered.length();
+            if (newLen > 16) filtered = filtered.substring(0, Math.max(0, 16 - (fb.getDocument().getLength() - length)));
+            super.replace(fb, offset, length, filtered, attr);
+        }
+    }
 }
